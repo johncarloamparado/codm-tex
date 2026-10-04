@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.18)
+project(codm_tex)
+set(CMAKE_CXX_STANDARD 17)
+set(DOBBY_GENERATE_SHARED OFF CACHE BOOL "" FORCE)
+add_subdirectory(Dobby)
+add_library(codm_tex SHARED main.cpp)
+target_include_directories(codm_tex PRIVATE ${CMAKE_SOURCE_DIR} Dobby/include)
+target_link_libraries(codm_tex dobby log)
