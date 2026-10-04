@@ -16,6 +16,7 @@
 #include <set>
 #include <string>
 #include <EGL/egl.h>
+#include <android/native_window.h>
 #include <GLES3/gl3.h>
 #include "zygisk.hpp"
 #include "lsplt.hpp"
@@ -25,6 +26,7 @@
 #define LOGF DIR "codm_tex.log"
 #define CFGF DIR "bias.txt"
 #define FPSF DIR "fps.txt"
+#define SCLF DIR "scale.txt"
 
 static std::mutex mu;
 static FILE *lf = nullptr;
@@ -39,6 +41,7 @@ static void L(const char *fmt, ...) {
 }
 
 /* ---------- Stage 2: mip bias (kapareho ng v3) ---------- */
+static std::atomic<int> g_scale{65};       /* 0 = patay; 20-99 = % ng native */
 static std::atomic<int> g_bias{2};
 static std::atomic<int> g_applied{0};
 static void (*real_tp)(GLenum, GLenum, GLint) = nullptr;
@@ -116,12 +119,45 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
         float p50 = ft[n / 2], p99 = ft[std::min(n - 1, (size_t)(n * 0.99))], mx = ft[n - 1];
         size_t s33 = 0, s50 = 0;
         for (float v : ft) { if (v > 33.4f) s33++; if (v > 50.f) s50++; }
-        L("FT fps=%.1f avg=%.1fms p50=%.1f p99=%.1f max=%.1f >33ms=%zu >50ms=%zu n=%zu cap=%d bias=%d\n",
-          1000.0 * n / sum, sum / n, p50, p99, mx, s33, s50, n, cap, g_bias.load());
+        L("FT fps=%.1f avg=%.1fms p50=%.1f p99=%.1f max=%.1f >33ms=%zu >50ms=%zu n=%zu cap=%d bias=%d scale=%d\n",
+          1000.0 * n / sum, sum / n, p50, p99, mx, s33, s50, n, cap, g_bias.load(), g_scale.load());
         ft.clear();
         win_start = t;
     }
     return r;
+}
+
+/* ---------- Stage 4: render scale (liitan ang buffer ng window) ---------- */
+static std::atomic<int> g_fullw{0}, g_fullh{0};
+static std::atomic<int> g_sbgn{0};
+
+static EGLSurface (*o_cws)(EGLDisplay, EGLConfig, EGLNativeWindowType, const EGLint *) = nullptr;
+static EGLSurface h_cws(EGLDisplay d, EGLConfig c, EGLNativeWindowType win, const EGLint *at) {
+    int s = g_scale.load();
+    ANativeWindow *nwin = (ANativeWindow *)win;
+    if (s > 0 && nwin) {
+        int w = ANativeWindow_getWidth(nwin), h = ANativeWindow_getHeight(nwin);
+        if (w > 0 && h > 0) {
+            int fw = g_fullw.load(), fh = g_fullh.load();
+            if (fw == 0 || ((w > h) != (fw > fh)) || w > fw) { g_fullw = fw = w; g_fullh = fh = h; }
+            int nw = fw * s / 100, nh = fh * s / 100;
+            int r = ANativeWindow_setBuffersGeometry(nwin, nw, nh, 0);
+            L("SURFACE cur=%dx%d full=%dx%d -> %dx%d r=%d\n", w, h, fw, fh, nw, nh, r);
+        }
+    }
+    return o_cws ? o_cws(d, c, win, at) : EGL_NO_SURFACE;
+}
+
+static int32_t (*o_sbg)(ANativeWindow *, int32_t, int32_t, int32_t) = nullptr;
+static int32_t h_sbg(ANativeWindow *w, int32_t ww, int32_t hh, int32_t f) {
+    int s = g_scale.load(), fw = g_fullw.load(), fh = g_fullh.load();
+    int n = ++g_sbgn;
+    if (n <= 20) L("SBG call %dx%d fmt=%d\n", ww, hh, f);
+    if (s > 0 && fw > 0 && (ww == 0 || hh == 0 || (ww >= fw && hh >= fh))) {
+        ww = fw * s / 100; hh = fh * s / 100;
+        if (n <= 20) L("SBG overridden -> %dx%d\n", ww, hh);
+    }
+    return o_sbg ? o_sbg(w, ww, hh, f) : ANativeWindow_setBuffersGeometry(w, ww, hh, f);
 }
 
 static void *wrap(const char *n, void *r) {
@@ -129,6 +165,8 @@ static void *wrap(const char *n, void *r) {
     if (!strcmp(n, "glTexParameteri")) { if (!real_tp) real_tp = (decltype(real_tp))r; return r; }
     if (!strcmp(n, "glTexStorage2D")) { if (!o_st) o_st = (decltype(o_st))r; return (void *)h_st; }
     if (!strcmp(n, "eglSwapBuffers")) { if (!o_swap) o_swap = (decltype(o_swap))r; return (void *)h_swap; }
+    if (!strcmp(n, "eglCreateWindowSurface")) { if (!o_cws) o_cws = (decltype(o_cws))r; return (void *)h_cws; }
+    if (!strcmp(n, "ANativeWindow_setBuffersGeometry")) { if (!o_sbg) o_sbg = (decltype(o_sbg))r; return (void *)h_sbg; }
     return r;
 }
 
@@ -162,12 +200,21 @@ static void load_cfg() {
         f = fopen(FPSF, "w");
         if (f) { fprintf(f, "0\n"); fclose(f); }
     }
+    f = fopen(SCLF, "r");
+    if (f) {
+        int v = 65;
+        if (fscanf(f, "%d", &v) == 1) g_scale = (v >= 20 && v <= 99) ? v : 0;
+        fclose(f);
+    } else {
+        f = fopen(SCLF, "w");
+        if (f) { fprintf(f, "65\n"); fclose(f); }
+    }
 }
 
 static void run() {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
-    L("=== start v4 bias=%d fpscap=%d ===\n", g_bias.load(), g_fps.load());
+    L("=== start v5 bias=%d fpscap=%d scale=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load());
     for (int i = 0; i < 600; i++) {
         bool added = false;
         for (auto &m : lsplt::MapInfo::Scan()) {
@@ -178,6 +225,8 @@ static void run() {
             lsplt::RegisterHook(m.dev, m.inode, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
             lsplt::RegisterHook(m.dev, m.inode, "glTexStorage2D", (void *)h_st, (void **)&o_st);
             lsplt::RegisterHook(m.dev, m.inode, "eglSwapBuffers", (void *)h_swap, (void **)&o_swap);
+            lsplt::RegisterHook(m.dev, m.inode, "eglCreateWindowSurface", (void *)h_cws, (void **)&o_cws);
+            lsplt::RegisterHook(m.dev, m.inode, "ANativeWindow_setBuffersGeometry", (void *)h_sbg, (void **)&o_sbg);
             added = true;
         }
         if (added) L("commit=%d\n", lsplt::CommitHook());
