@@ -1,6 +1,6 @@
 id=codm_tex_logger
 name=CODM Texture Logger
-version=v0.6
-versionCode=6
+version=v0.7
+versionCode=7
 author=me
-description=Stage 4 render scale fix
+description=Stage 4 safe hook delay
