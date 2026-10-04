@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(codm_tex)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libs)
 add_subdirectory(LSPlt/lsplt/src/main/jni lsplt)
 add_library(codm_tex SHARED main.cpp)
 target_include_directories(codm_tex PRIVATE ${CMAKE_SOURCE_DIR})
