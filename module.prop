@@ -1,6 +1,6 @@
 id=codm_tex_logger
 name=CODM Texture Logger
-version=v0.1
-versionCode=1
+version=v0.4
+versionCode=4
 author=me
-description=Stage 1 logger only
+description=Stage 3 frametime logger
