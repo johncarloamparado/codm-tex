@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <vector>
 #include <set>
+#include <map>
 #include <string>
 #include <EGL/egl.h>
 #include <android/native_window.h>
@@ -218,13 +219,20 @@ static void load_cfg() {
 static void run() {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
-    L("=== start v6 bias=%d fpscap=%d scale=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load());
-    for (int i = 0; i < 1200; i++) {
+    std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
+    L("=== start v7 bias=%d fpscap=%d scale=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load());
+    for (int i = 0; i < 2400; i++) {
         bool added = false;
         for (auto &m : lsplt::MapInfo::Scan()) {
             const std::string &p = m.path;
             if (p.size() < 12 || p.compare(p.size() - 12, 12, "/libunity.so") != 0) continue;
-            if (!done.insert({m.dev, m.inode}).second) continue;
+            std::pair<dev_t, ino_t> key{m.dev, m.inode};
+            if (done.count(key)) continue;
+            auto it = first.find(key);
+            if (it == first.end()) { first[key] = now_ns(); continue; }
+            /* hintayin munang matapos ang pag-load ng libunity (iwas race/crash) */
+            if (now_ns() - it->second < 5000000000LL) continue;
+            done.insert(key);
             lsplt::RegisterHook(m.dev, m.inode, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
             lsplt::RegisterHook(m.dev, m.inode, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
             lsplt::RegisterHook(m.dev, m.inode, "glTexStorage2D", (void *)h_st, (void **)&o_st);
@@ -234,7 +242,7 @@ static void run() {
             added = true;
         }
         if (added) L("commit=%d\n", lsplt::CommitHook());
-        usleep(i < 600 ? 100000 : 1000000);   /* unang 60s: mabilis para di mahuli */
+        usleep(250000);
     }
 }
 
