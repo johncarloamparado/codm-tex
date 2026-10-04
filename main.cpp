@@ -40,7 +40,7 @@ static void L(const char *fmt, ...) {
     fflush(lf);
 }
 
-/* ---------- Stage 2: mip bias (kapareho ng v3) ---------- */
+/* ---------- Stage 2: mip bias ---------- */
 static std::atomic<int> g_scale{65};       /* 0 = patay; 20-99 = % ng native */
 static std::atomic<int> g_bias{2};
 static std::atomic<int> g_applied{0};
@@ -128,7 +128,7 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
 }
 
 /* ---------- Stage 4: render scale (liitan ang buffer ng window) ---------- */
-static std::atomic<int> g_fullw{0}, g_fullh{0};
+static std::atomic<int> g_fullw{1600}, g_fullh{720};   /* seed: native ng phone mo; lalaki lang, hindi liliit */
 static std::atomic<int> g_sbgn{0};
 
 static EGLSurface (*o_cws)(EGLDisplay, EGLConfig, EGLNativeWindowType, const EGLint *) = nullptr;
@@ -138,11 +138,15 @@ static EGLSurface h_cws(EGLDisplay d, EGLConfig c, EGLNativeWindowType win, cons
     if (s > 0 && nwin) {
         int w = ANativeWindow_getWidth(nwin), h = ANativeWindow_getHeight(nwin);
         if (w > 0 && h > 0) {
-            int fw = g_fullw.load(), fh = g_fullh.load();
-            if (fw == 0 || ((w > h) != (fw > fh)) || w > fw) { g_fullw = fw = w; g_fullh = fh = h; }
-            int nw = fw * s / 100, nh = fh * s / 100;
-            int r = ANativeWindow_setBuffersGeometry(nwin, nw, nh, 0);
-            L("SURFACE cur=%dx%d full=%dx%d -> %dx%d r=%d\n", w, h, fw, fh, nw, nh, r);
+            if (w < h) {
+                L("SURFACE portrait %dx%d: skip\n", w, h);
+            } else {
+                int fw = g_fullw.load(), fh = g_fullh.load();
+                if (w > fw) { g_fullw = fw = w; g_fullh = fh = h; }
+                int nw = fw * s / 100, nh = fh * s / 100;
+                int r = ANativeWindow_setBuffersGeometry(nwin, nw, nh, 0);
+                L("SURFACE cur=%dx%d full=%dx%d -> %dx%d r=%d\n", w, h, fw, fh, nw, nh, r);
+            }
         }
     }
     return o_cws ? o_cws(d, c, win, at) : EGL_NO_SURFACE;
@@ -214,8 +218,8 @@ static void load_cfg() {
 static void run() {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
-    L("=== start v5 bias=%d fpscap=%d scale=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load());
-    for (int i = 0; i < 600; i++) {
+    L("=== start v6 bias=%d fpscap=%d scale=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load());
+    for (int i = 0; i < 1200; i++) {
         bool added = false;
         for (auto &m : lsplt::MapInfo::Scan()) {
             const std::string &p = m.path;
@@ -230,7 +234,7 @@ static void run() {
             added = true;
         }
         if (added) L("commit=%d\n", lsplt::CommitHook());
-        sleep(1);
+        usleep(i < 600 ? 100000 : 1000000);   /* unang 60s: mabilis para di mahuli */
     }
 }
 
