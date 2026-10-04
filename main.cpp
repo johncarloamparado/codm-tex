@@ -78,7 +78,7 @@ static void run() {
         bool added = false;
         for (auto &m : lsplt::MapInfo::Scan()) {
             const std::string &p = m.path;
-            if (p.size() < 12 || p.compare(p.size() - 11, 11, "/libunity.so") != 0) continue;
+            if (p.size() < 12 || p.compare(p.size() - 12, 12, "/libunity.so") != 0) continue;
             if (!done.insert({m.dev, m.inode}).second) continue;
             lsplt::RegisterHook(m.dev, m.inode, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
             lsplt::RegisterHook(m.dev, m.inode, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
