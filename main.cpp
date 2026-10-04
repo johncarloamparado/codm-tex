@@ -28,6 +28,7 @@
 #define CFGF DIR "bias.txt"
 #define FPSF DIR "fps.txt"
 #define SCLF DIR "scale.txt"
+#define MODEF DIR "mode.txt"
 
 static std::mutex mu;
 static FILE *lf = nullptr;
@@ -216,33 +217,54 @@ static void load_cfg() {
     }
 }
 
-static void run() {
+/* mode.txt: 0 = walang ginagawa | 1 = thread lang | 2 = thread + hanap libunity (walang hook) | 3 = buong hook */
+static int read_mode() {
+    int v = 0;
+    FILE *f = fopen(MODEF, "r");
+    if (f) {
+        if (fscanf(f, "%d", &v) != 1) v = 0;
+        fclose(f);
+    } else {
+        f = fopen(MODEF, "w");
+        if (f) { fprintf(f, "0\n"); fclose(f); }
+    }
+    return std::max(0, std::min(v, 3));
+}
+
+static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
     std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
-    L("=== start v7 bias=%d fpscap=%d scale=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load());
-    for (int i = 0; i < 2400; i++) {
-        bool added = false;
-        for (auto &m : lsplt::MapInfo::Scan()) {
-            const std::string &p = m.path;
-            if (p.size() < 12 || p.compare(p.size() - 12, 12, "/libunity.so") != 0) continue;
-            std::pair<dev_t, ino_t> key{m.dev, m.inode};
-            if (done.count(key)) continue;
-            auto it = first.find(key);
-            if (it == first.end()) { first[key] = now_ns(); continue; }
-            /* hintayin munang matapos ang pag-load ng libunity (iwas race/crash) */
-            if (now_ns() - it->second < 5000000000LL) continue;
-            done.insert(key);
-            lsplt::RegisterHook(m.dev, m.inode, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
-            lsplt::RegisterHook(m.dev, m.inode, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
-            lsplt::RegisterHook(m.dev, m.inode, "glTexStorage2D", (void *)h_st, (void **)&o_st);
-            lsplt::RegisterHook(m.dev, m.inode, "eglSwapBuffers", (void *)h_swap, (void **)&o_swap);
-            lsplt::RegisterHook(m.dev, m.inode, "eglCreateWindowSurface", (void *)h_cws, (void **)&o_cws);
-            lsplt::RegisterHook(m.dev, m.inode, "ANativeWindow_setBuffersGeometry", (void *)h_sbg, (void **)&o_sbg);
-            added = true;
+    L("=== start v8 mode=%d bias=%d fpscap=%d scale=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load());
+    int total = (mode == 1) ? 60 : 1200;
+    for (int i = 0; i < total; i++) {
+        if (mode >= 2) {
+            bool added = false;
+            for (auto &m : lsplt::MapInfo::Scan()) {
+                const std::string &p = m.path;
+                if (p.size() < 12 || p.compare(p.size() - 12, 12, "/libunity.so") != 0) continue;
+                std::pair<dev_t, ino_t> key{m.dev, m.inode};
+                if (done.count(key)) continue;
+                auto it = first.find(key);
+                if (it == first.end()) { first[key] = now_ns(); L("SEEN libunity i=%d\n", i); continue; }
+                if (now_ns() - it->second < 3000000000LL) continue;   /* hintayin matapos ang load */
+                done.insert(key);
+                if (mode == 2) { L("mode2: stable, walang hook\n"); continue; }
+                lsplt::RegisterHook(m.dev, m.inode, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
+                lsplt::RegisterHook(m.dev, m.inode, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
+                lsplt::RegisterHook(m.dev, m.inode, "glTexStorage2D", (void *)h_st, (void **)&o_st);
+                lsplt::RegisterHook(m.dev, m.inode, "eglSwapBuffers", (void *)h_swap, (void **)&o_swap);
+                lsplt::RegisterHook(m.dev, m.inode, "eglCreateWindowSurface", (void *)h_cws, (void **)&o_cws);
+                lsplt::RegisterHook(m.dev, m.inode, "ANativeWindow_setBuffersGeometry", (void *)h_sbg, (void **)&o_sbg);
+                added = true;
+            }
+            if (added) {
+                L("pre-commit\n");
+                bool ok = lsplt::CommitHook();
+                L("commit=%d\n", (int)ok);
+            }
         }
-        if (added) L("commit=%d\n", lsplt::CommitHook());
-        usleep(250000);
+        sleep(1);
     }
 }
 
@@ -257,7 +279,9 @@ public:
         if (!target) api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
     }
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
-        if (target) std::thread(run).detach();
+        if (!target) return;
+        int mode = read_mode();
+        if (mode >= 1) std::thread(run, mode).detach();
     }
 };
 REGISTER_ZYGISK_MODULE(M)
