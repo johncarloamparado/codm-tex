@@ -1,13 +1,14 @@
 #include <cstdarg>
 #include <jni.h>
-#include <dlfcn.h>
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
 #include <thread>
+#include <set>
+#include <string>
 #include <GLES3/gl3.h>
 #include "zygisk.hpp"
-#include "dobby.h"
+#include "lsplt.hpp"
 
 #define PKG "com.garena.game.codm"
 #define LOGF "/data/data/" PKG "/files/codm_tex.log"
@@ -37,14 +38,23 @@ static void h_ti(GLenum t, GLint lv, GLint fmt, GLsizei w, GLsizei h, GLint b, G
 }
 
 static void run() {
-    void *h = nullptr;
-    for (int i = 0; i < 120 && !h; i++) { h = dlopen("libGLESv2.so", RTLD_NOW); if (!h) sleep(1); }
-    if (!h) return;
+    std::set<std::pair<dev_t, ino_t>> done;
     L("=== start ===\n");
-    void *p;
-    if ((p = dlsym(h, "glTexStorage2D"))) DobbyHook(p, (void *)h_st, (void **)&o_st);
-    if ((p = dlsym(h, "glCompressedTexImage2D"))) DobbyHook(p, (void *)h_ct, (void **)&o_ct);
-    if ((p = dlsym(h, "glTexImage2D"))) DobbyHook(p, (void *)h_ti, (void **)&o_ti);
+    for (int i = 0; i < 300; i++) {
+        bool added = false;
+        for (auto &m : lsplt::MapInfo::Scan()) {
+            if (m.path.rfind("/data/app", 0) != 0) continue;
+            if (m.path.size() < 3 || m.path.compare(m.path.size() - 3, 3, ".so") != 0) continue;
+            if (!done.insert({m.dev, m.inode}).second) continue;
+            lsplt::RegisterHook(m.dev, m.inode, "glTexStorage2D", (void *)h_st, (void **)&o_st);
+            lsplt::RegisterHook(m.dev, m.inode, "glCompressedTexImage2D", (void *)h_ct, (void **)&o_ct);
+            lsplt::RegisterHook(m.dev, m.inode, "glTexImage2D", (void *)h_ti, (void **)&o_ti);
+            L("hooked %s\n", m.path.c_str());
+            added = true;
+        }
+        if (added) lsplt::CommitHook();
+        sleep(1);
+    }
 }
 
 class M : public zygisk::ModuleBase {
