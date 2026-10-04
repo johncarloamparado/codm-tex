@@ -1,6 +1,6 @@
 id=codm_tex_logger
 name=CODM Texture Logger
-version=v0.7
-versionCode=7
+version=v0.8
+versionCode=8
 author=me
-description=Stage 4 safe hook delay
+description=Stage 4 diagnostic modes
