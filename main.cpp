@@ -1,15 +1,21 @@
 #include <cstdarg>
+#include <cerrno>
 #include <jni.h>
 #include <dlfcn.h>
 #include <unistd.h>
+#include <time.h>
+#include <sys/syscall.h>
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
 #include <thread>
 #include <mutex>
 #include <atomic>
 #include <algorithm>
+#include <vector>
 #include <set>
 #include <string>
+#include <EGL/egl.h>
 #include <GLES3/gl3.h>
 #include "zygisk.hpp"
 #include "lsplt.hpp"
@@ -18,6 +24,7 @@
 #define DIR "/data/data/" PKG "/files/"
 #define LOGF DIR "codm_tex.log"
 #define CFGF DIR "bias.txt"
+#define FPSF DIR "fps.txt"
 
 static std::mutex mu;
 static FILE *lf = nullptr;
@@ -31,6 +38,7 @@ static void L(const char *fmt, ...) {
     fflush(lf);
 }
 
+/* ---------- Stage 2: mip bias (kapareho ng v3) ---------- */
 static std::atomic<int> g_bias{2};
 static std::atomic<int> g_applied{0};
 static void (*real_tp)(GLenum, GLenum, GLint) = nullptr;
@@ -53,10 +61,74 @@ static void h_st(GLenum t, GLsizei lv, GLenum fmt, GLsizei w, GLsizei h) {
     }
 }
 
+/* ---------- Stage 3: frame-time logger + FPS cap ---------- */
+static std::atomic<int> g_fps{0};          /* 0 = walang cap, logger lang */
+static std::atomic<pid_t> g_rt{0};         /* render thread (unang tumawag ng swap) */
+
+static inline int64_t now_ns() {
+    timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+}
+
+static EGLBoolean (*o_swap)(EGLDisplay, EGLSurface) = nullptr;
+static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
+    EGLBoolean r = o_swap ? o_swap(d, s) : EGL_FALSE;
+
+    pid_t tid = (pid_t)syscall(SYS_gettid);
+    pid_t exp = 0;
+    g_rt.compare_exchange_strong(exp, tid);
+    if (g_rt.load() != tid) return r;       /* ibang thread: huwag pakialaman */
+
+    static int64_t last = 0;                /* oras ng nakaraang frame (pagkatapos ng cap) */
+    static int64_t deadline = 0;            /* kailan dapat matapos ang kasalukuyang frame */
+    static int64_t win_start = 0;
+    static std::vector<float> ft;           /* frame times (ms) sa 5-segundong window */
+
+    int64_t t = now_ns();
+
+    /* FPS cap: tulugan ang natitirang oras para pantay ang pagitan ng frames */
+    int cap = g_fps.load();
+    if (cap > 0) {
+        int64_t iv = 1000000000LL / cap;
+        if (deadline == 0) deadline = t;
+        deadline += iv;
+        if (t > deadline + iv) deadline = t;          /* nahuli ng malaki: mag-reset */
+        else if (t < deadline) {
+            timespec ts;
+            ts.tv_sec = deadline / 1000000000LL;
+            ts.tv_nsec = deadline % 1000000000LL;
+            while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr) == EINTR) {}
+            t = now_ns();
+        }
+    }
+
+    if (last != 0) {
+        float ms = (float)((t - last) / 1e6);
+        if (ms < 1000.f) ft.push_back(ms);           /* huwag isama ang loading pauses */
+    }
+    last = t;
+    if (win_start == 0) win_start = t;
+
+    if (t - win_start >= 5000000000LL && ft.size() >= 10) {
+        std::sort(ft.begin(), ft.end());
+        double sum = 0; for (float v : ft) sum += v;
+        size_t n = ft.size();
+        float p50 = ft[n / 2], p99 = ft[std::min(n - 1, (size_t)(n * 0.99))], mx = ft[n - 1];
+        size_t s33 = 0, s50 = 0;
+        for (float v : ft) { if (v > 33.4f) s33++; if (v > 50.f) s50++; }
+        L("FT fps=%.1f avg=%.1fms p50=%.1f p99=%.1f max=%.1f >33ms=%zu >50ms=%zu n=%zu cap=%d bias=%d\n",
+          1000.0 * n / sum, sum / n, p50, p99, mx, s33, s50, n, cap, g_bias.load());
+        ft.clear();
+        win_start = t;
+    }
+    return r;
+}
+
 static void *wrap(const char *n, void *r) {
     if (!n || !r) return r;
     if (!strcmp(n, "glTexParameteri")) { if (!real_tp) real_tp = (decltype(real_tp))r; return r; }
     if (!strcmp(n, "glTexStorage2D")) { if (!o_st) o_st = (decltype(o_st))r; return (void *)h_st; }
+    if (!strcmp(n, "eglSwapBuffers")) { if (!o_swap) o_swap = (decltype(o_swap))r; return (void *)h_swap; }
     return r;
 }
 
@@ -81,12 +153,21 @@ static void load_cfg() {
         f = fopen(CFGF, "w");
         if (f) { fprintf(f, "2\n"); fclose(f); }
     }
+    f = fopen(FPSF, "r");
+    if (f) {
+        int v = 0;
+        if (fscanf(f, "%d", &v) == 1) g_fps = (v >= 20 && v <= 120) ? v : 0;
+        fclose(f);
+    } else {
+        f = fopen(FPSF, "w");
+        if (f) { fprintf(f, "0\n"); fclose(f); }
+    }
 }
 
 static void run() {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
-    L("=== start v3 bias=%d ===\n", g_bias.load());
+    L("=== start v4 bias=%d fpscap=%d ===\n", g_bias.load(), g_fps.load());
     for (int i = 0; i < 600; i++) {
         bool added = false;
         for (auto &m : lsplt::MapInfo::Scan()) {
@@ -96,6 +177,7 @@ static void run() {
             lsplt::RegisterHook(m.dev, m.inode, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
             lsplt::RegisterHook(m.dev, m.inode, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
             lsplt::RegisterHook(m.dev, m.inode, "glTexStorage2D", (void *)h_st, (void **)&o_st);
+            lsplt::RegisterHook(m.dev, m.inode, "eglSwapBuffers", (void *)h_swap, (void **)&o_swap);
             added = true;
         }
         if (added) L("commit=%d\n", lsplt::CommitHook());
