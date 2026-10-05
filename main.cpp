@@ -18,6 +18,7 @@
 #include <string>
 #include <EGL/egl.h>
 #include <android/native_window.h>
+#include <android/dlext.h>
 #include <GLES3/gl3.h>
 #include "zygisk.hpp"
 #include "lsplt.hpp"
@@ -217,7 +218,7 @@ static void load_cfg() {
     }
 }
 
-/* mode.txt: 0 = walang ginagawa | 1 = thread lang | 2 = thread + hanap libunity (walang hook) | 3 = buong hook */
+/* mode.txt: 0 = walang ginagawa | 1 = thread lang | 2 = thread + hanap libunity (walang hook) | 3 = buong hook (polling) | 4 = hook sa mismong pag-load ng libunity (walang thread) */
 static int read_mode() {
     int v = 0;
     FILE *f = fopen(MODEF, "r");
@@ -228,14 +229,62 @@ static int read_mode() {
         f = fopen(MODEF, "w");
         if (f) { fprintf(f, "0\n"); fclose(f); }
     }
-    return std::max(0, std::min(v, 3));
+    return std::max(0, std::min(v, 4));
+}
+
+/* ---------- Mode 4: i-hook ang libunity ilang sandali LANG matapos itong ma-load ---------- */
+static std::atomic<bool> g_hooked{false};
+static void *(*o_adle)(const char *, int, const android_dlextinfo *) = nullptr;
+
+static void install_unity_hooks() {
+    if (g_hooked.exchange(true)) return;
+    for (auto &m : lsplt::MapInfo::Scan()) {
+        const std::string &p = m.path;
+        if (p.size() < 12 || p.compare(p.size() - 12, 12, "/libunity.so") != 0) continue;
+        lsplt::RegisterHook(m.dev, m.inode, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
+        lsplt::RegisterHook(m.dev, m.inode, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
+        lsplt::RegisterHook(m.dev, m.inode, "glTexStorage2D", (void *)h_st, (void **)&o_st);
+        lsplt::RegisterHook(m.dev, m.inode, "eglSwapBuffers", (void *)h_swap, (void **)&o_swap);
+        lsplt::RegisterHook(m.dev, m.inode, "eglCreateWindowSurface", (void *)h_cws, (void **)&o_cws);
+        lsplt::RegisterHook(m.dev, m.inode, "ANativeWindow_setBuffersGeometry", (void *)h_sbg, (void **)&o_sbg);
+        L("pre-commit (unity)\n");
+        bool ok = lsplt::CommitHook();
+        L("commit=%d (unity)\n", (int)ok);
+        return;
+    }
+    L("libunity hindi nakita sa maps\n");
+    g_hooked = false;
+}
+
+static void *h_adle(const char *path, int flags, const android_dlextinfo *info) {
+    void *r = o_adle ? o_adle(path, flags, info) : android_dlopen_ext(path, flags, info);
+    if (r && path) {
+        size_t n = strlen(path);
+        if (n >= 11 && !strcmp(path + n - 11, "libunity.so")) {
+            L("dlopen libunity tapos na: %s\n", path);
+            install_unity_hooks();
+        }
+    }
+    return r;
+}
+
+static void hook_nativeloader() {
+    for (auto &m : lsplt::MapInfo::Scan()) {
+        const std::string &p = m.path;
+        if (p.size() < 19 || p.compare(p.size() - 19, 19, "/libnativeloader.so") != 0) continue;
+        lsplt::RegisterHook(m.dev, m.inode, "android_dlopen_ext", (void *)h_adle, (void **)&o_adle);
+        bool ok = lsplt::CommitHook();
+        L("nativeloader hook commit=%d\n", (int)ok);
+        return;
+    }
+    L("libnativeloader hindi nakita\n");
 }
 
 static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
     std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
-    L("=== start v8 mode=%d bias=%d fpscap=%d scale=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load());
+    L("=== start v9 mode=%d bias=%d fpscap=%d scale=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load());
     int total = (mode == 1) ? 60 : 1200;
     for (int i = 0; i < total; i++) {
         if (mode >= 2) {
@@ -281,6 +330,12 @@ public:
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
         if (!target) return;
         int mode = read_mode();
+        if (mode == 4) {
+            load_cfg();
+            L("=== start v9 mode=4 bias=%d fpscap=%d scale=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load());
+            hook_nativeloader();
+            return;
+        }
         if (mode >= 1) std::thread(run, mode).detach();
     }
 };
