@@ -466,4 +466,21 @@ class M : public zygisk::ModuleBase {
 public:
     void onLoad(zygisk::Api *a, JNIEnv *e) override { api = a; env = e; }
     void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
-        const char
+        const char *n = env->GetStringUTFChars(args->nice_name, nullptr);
+        target = n && strcmp(n, PKG) == 0;
+        env->ReleaseStringUTFChars(args->nice_name, n);
+        if (!target) api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+    }
+    void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
+        if (!target) return;
+        int mode = read_mode();
+        if (mode == 4) {
+            load_cfg();
+            L("=== start v10 mode=4 bias=%d fpscap=%d scale=%d fz=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load());
+            hook_nativeloader();
+            return;
+        }
+        if (mode >= 1) std::thread(run, mode).detach();
+    }
+};
+REGISTER_ZYGISK_MODULE(M)
