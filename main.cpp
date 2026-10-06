@@ -6,6 +6,8 @@
 #include <time.h>
 #include <sys/syscall.h>
 #include <sys/resource.h>
+#include <dirent.h>
+#include <fcntl.h>
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -36,6 +38,7 @@
 #define SCLF DIR "scale.txt"
 #define MODEF DIR "mode.txt"
 #define FZF DIR "fz.txt"
+#define THF DIR "th.txt"
 
 static std::mutex mu;
 static FILE *lf = nullptr;
@@ -142,6 +145,116 @@ static void h_ts3(GLenum t, GLsizei lv, GLenum f, GLsizei w, GLsizei h, GLsizei 
     if (!o_ts3) return; TIMED(K_TEX, o_ts3(t, lv, f, w, h, d));
 }
 
+/* ---------- Stage 6: per-thread CPU (alin ang busy habang may freeze) ---------- */
+/* th.txt: 0 = patay | 1 = buksan (default). Walang bagong thread; ang render thread lang ang nagbabasa ng /proc. */
+static std::atomic<int> g_th{1};
+static int g_sched_mode = -1;              /* 1 = schedstat (ns) | 0 = stat (ticks) */
+struct Thr { pid_t tid; int fd; int64_t prev, cur, wprev, wcur; char name[20]; };
+static std::vector<Thr> g_thr;             /* render thread lang ang humahawak */
+static int g_nthr = 0;
+static const size_t MAXT = 48;
+
+static bool read_cpu(int fd, int64_t &run, int64_t &wait) {
+    char b[256];
+    ssize_t n = pread(fd, b, sizeof(b) - 1, 0);
+    if (n <= 0) return false;
+    b[n] = 0;
+    if (g_sched_mode == 1) {
+        char *e = nullptr;
+        run = strtoll(b, &e, 10);
+        wait = (e && *e) ? strtoll(e, &e, 10) : 0;
+        return true;
+    }
+    char *p = strrchr(b, ')');
+    if (!p) return false;
+    unsigned long ut = 0, st = 0;
+    if (sscanf(p + 2, "%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu", &ut, &st) != 2) return false;
+    run = (int64_t)(ut + st) * 10000000LL;
+    wait = 0;
+    return true;
+}
+
+static void th_init() {
+    char path[64];
+    snprintf(path, sizeof path, "/proc/self/task/%d/schedstat", (int)getpid());
+    g_sched_mode = 0;
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd >= 0) {
+        g_sched_mode = 1;
+        int64_t r = 0, w = 0;
+        if (!read_cpu(fd, r, w) || r <= 0) g_sched_mode = 0;
+        close(fd);
+    }
+    L("THR mode=%s\n", g_sched_mode == 1 ? "schedstat" : "stat");
+}
+
+static void th_rescan() {
+    for (auto &t : g_thr) if (t.fd >= 0) close(t.fd);
+    g_thr.clear();
+    auto d = opendir("/proc/self/task");
+    if (!d) return;
+    std::vector<Thr> all;
+    while (dirent *e = readdir(d)) {
+        if (e->d_name[0] < '0' || e->d_name[0] > '9') continue;
+        pid_t tid = (pid_t)atoi(e->d_name);
+        char path[64];
+        snprintf(path, sizeof path, "/proc/self/task/%d/%s", (int)tid, g_sched_mode == 1 ? "schedstat" : "stat");
+        int fd = open(path, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) continue;
+        Thr t; memset(&t, 0, sizeof t);
+        t.tid = tid; t.fd = fd;
+        if (!read_cpu(fd, t.cur, t.wcur)) { close(fd); continue; }
+        t.prev = t.cur; t.wprev = t.wcur;
+        snprintf(path, sizeof path, "/proc/self/task/%d/comm", (int)tid);
+        int cf = open(path, O_RDONLY | O_CLOEXEC);
+        ssize_t n = 0;
+        if (cf >= 0) { n = read(cf, t.name, 15); close(cf); }
+        if (n > 0) {
+            t.name[n] = 0;
+            for (char *c = t.name; *c; c++) if (*c == '\n' || *c == ' ') *c = (*c == '\n') ? 0 : '_';
+        } else strcpy(t.name, "?");
+        all.push_back(t);
+    }
+    closedir(d);
+    g_nthr = (int)all.size();
+    std::sort(all.begin(), all.end(), [](const Thr &a, const Thr &b) { return a.cur > b.cur; });
+    pid_t me = getpid(), rt = g_rt.load();
+    for (size_t i = 0; i < all.size(); i++) {
+        if (i < MAXT || all[i].tid == me || all[i].tid == rt) g_thr.push_back(all[i]);
+        else close(all[i].fd);
+    }
+}
+
+static void th_snapshot() {
+    for (auto &x : g_thr) {
+        if (x.fd < 0) continue;
+        x.prev = x.cur; x.wprev = x.wcur;
+        if (!read_cpu(x.fd, x.cur, x.wcur)) { close(x.fd); x.fd = -1; x.cur = x.prev; x.wcur = x.wprev; }
+    }
+}
+
+static void th_log(long long frame, float ms, double t_s) {
+    pid_t me = getpid(), rt = g_rt.load();
+    std::vector<std::pair<int64_t, size_t>> v;
+    double sum = 0, rwait = 0;
+    for (size_t i = 0; i < g_thr.size(); i++) {
+        int64_t dl = g_thr[i].cur - g_thr[i].prev;
+        if (dl < 0) dl = 0;
+        sum += dl / 1e6;
+        if (g_thr[i].tid == rt) rwait = (g_thr[i].wcur - g_thr[i].wprev) / 1e6;
+        if (dl >= 3000000LL) v.push_back({dl, i});
+    }
+    std::sort(v.begin(), v.end(), [](const std::pair<int64_t, size_t> &a, const std::pair<int64_t, size_t> &b) { return a.first > b.first; });
+    char buf[420]; int len = 0;
+    len += snprintf(buf + len, sizeof(buf) - len, "THR t=%.2f f=%lld ms=%.0f sum=%.0f rwait=%.0f nthr=%d |", t_s, frame, ms, sum, rwait, g_nthr);
+    for (size_t k = 0; k < v.size() && k < 6 && len < (int)sizeof(buf) - 40; k++) {
+        const Thr &x = g_thr[v[k].second];
+        len += snprintf(buf + len, sizeof(buf) - len, " %s%s=%.0f", x.name,
+                        x.tid == rt ? "*" : (x.tid == me ? "!" : ""), v[k].first / 1e6);
+    }
+    L("%s\n", buf);
+}
+
 static inline double tv_ms(const timeval &a) { return a.tv_sec * 1000.0 + a.tv_usec / 1000.0; }
 
 static EGLBoolean (*o_swap)(EGLDisplay, EGLSurface) = nullptr;
@@ -164,6 +277,7 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     static int fz_logged = 0;               /* limit ng FREEZE lines kada bukas */
     static rusage ru_last;
     static bool ru_ok = false;
+    static int64_t next_scan = 0;
 
     int64_t t = t_post;
     if (g_t0.load() == 0) g_t0 = t;
@@ -196,6 +310,10 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     /* Freeze logger: basahin at i-reset ang mga counter bawat frame */
     if (g_fz.load()) {
         rusage ru; bool ok = (getrusage(RUSAGE_THREAD, &ru) == 0);
+        bool th_on = g_th.load() != 0;
+        if (th_on && g_sched_mode < 0) th_init();
+        if (th_on && g_thr.empty()) th_rescan();
+        if (th_on) th_snapshot();
         int cc[2][K_N]; int64_t cn[2][K_N];
         for (int i = 0; i < 2; i++)
             for (int k = 0; k < K_N; k++) { cc[i][k] = c_cnt[i][k].exchange(0); cn[i][k] = c_ns[i][k].exchange(0); }
@@ -221,9 +339,11 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
                   cc[1][K_COMP], cn[1][K_COMP] / 1e6, cc[1][K_LINK], cn[1][K_LINK] / 1e6,
                   cc[1][K_PBIN], cn[1][K_PBIN] / 1e6, cc[1][K_BUF], cn[1][K_BUF] / 1e6,
                   cc[1][K_TEX], cn[1][K_TEX] / 1e6);
+                if (th_on) th_log((long long)frame_no, ms, (t - g_t0.load()) / 1e9);
             }
         }
         if (ok) { ru_last = ru; ru_ok = true; }
+        if (th_on && t >= next_scan) { th_rescan(); next_scan = t + 5000000000LL; }
     }
 
     if (t - win_start >= 5000000000LL && ft.size() >= 10) {
@@ -349,6 +469,15 @@ static void load_cfg() {
         f = fopen(FZF, "w");
         if (f) { fprintf(f, "1\n"); fclose(f); }
     }
+    f = fopen(THF, "r");
+    if (f) {
+        int v = 1;
+        if (fscanf(f, "%d", &v) == 1) g_th = v ? 1 : 0;
+        fclose(f);
+    } else {
+        f = fopen(THF, "w");
+        if (f) { fprintf(f, "1\n"); fclose(f); }
+    }
 }
 
 /* mode.txt: 0 = walang ginagawa | 1 = thread lang | 2 = thread + hanap libunity (walang hook) | 3 = buong hook (polling) | 4 = hook sa mismong pag-load ng libunity (walang thread) */
@@ -433,7 +562,7 @@ static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
     std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
-    L("=== start v10 mode=%d bias=%d fpscap=%d scale=%d fz=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load());
+    L("=== start v11 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load());
     int total = (mode == 1) ? 60 : 1200;
     for (int i = 0; i < total; i++) {
         if (mode >= 2) {
@@ -476,7 +605,7 @@ public:
         int mode = read_mode();
         if (mode == 4) {
             load_cfg();
-            L("=== start v10 mode=4 bias=%d fpscap=%d scale=%d fz=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load());
+            L("=== start v11 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load());
             hook_nativeloader();
             return;
         }
