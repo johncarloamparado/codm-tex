@@ -1,6 +1,6 @@
 id=codm_tex_logger
 name=CODM Texture Logger
-version=v0.10
-versionCode=10
+version=v0.11
+versionCode=11
 author=me
-description=Stage 5 freeze logger (mode 4)
+description=Stage 6 per-thread freeze logger (mode 4)
