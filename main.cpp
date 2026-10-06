@@ -8,6 +8,7 @@
 #include <sys/resource.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <sched.h>
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -39,6 +40,7 @@
 #define MODEF DIR "mode.txt"
 #define FZF DIR "fz.txt"
 #define THF DIR "th.txt"
+#define COREF DIR "core.txt"
 
 static std::mutex mu;
 static FILE *lf = nullptr;
@@ -154,6 +156,108 @@ static std::vector<Thr> g_thr;             /* render thread lang ang humahawak *
 static int g_nthr = 0;
 static const size_t MAXT = 48;
 
+/* ---------- Stage 7: core logger (logging lang) ---------- */
+/* core.txt: 0 = patay | 1 = bukas (default). Gumagana lang kapag fz.txt = 1 at th.txt = 1. */
+static std::atomic<int> g_core{1};
+static const int NC = 8;
+static std::vector<std::pair<pid_t, int>> g_um;    /* UnityMain: tid, fd ng stat */
+static int g_um_now = -1, g_um_prev = -1;
+static int g_h_um[NC], g_h_rt[NC], g_h_fz[NC];
+static int g_h_n = 0;
+
+static int read_int_file(const char *path) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    char b[32];
+    ssize_t n = read(fd, b, sizeof(b) - 1);
+    close(fd);
+    if (n <= 0) return -1;
+    b[n] = 0;
+    return atoi(b);
+}
+
+static int cpu_khz(int c) {
+    char p[96];
+    snprintf(p, sizeof p, "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq", c);
+    return read_int_file(p);
+}
+
+/* field 39 ("processor") ng /proc/.../stat = huling core na tinakbuhan */
+static int core_of(int fd) {
+    char b[640];
+    ssize_t n = pread(fd, b, sizeof(b) - 1, 0);
+    if (n <= 0) return -1;
+    b[n] = 0;
+    char *p = strrchr(b, ')');
+    if (!p || !p[1]) return -1;
+    p += 2;
+    for (int i = 0; i < 36; i++) {
+        p = strchr(p, ' ');
+        if (!p) return -1;
+        p++;
+    }
+    return atoi(p);
+}
+
+static void core_info() {
+    char buf[480]; int len = snprintf(buf, sizeof buf, "CORES");
+    for (int c = 0; c < NC && len < (int)sizeof(buf) - 60; c++) {
+        char p[96], a[16], m[16];
+        snprintf(p, sizeof p, "/sys/devices/system/cpu/cpu%d/cpu_capacity", c);
+        int cap = read_int_file(p);
+        snprintf(p, sizeof p, "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", c);
+        int mx = read_int_file(p);
+        if (cap >= 0) snprintf(a, sizeof a, "%d", cap); else strcpy(a, "n/a");
+        if (mx >= 0) snprintf(m, sizeof m, "%d", mx); else strcpy(m, "n/a");
+        len += snprintf(buf + len, sizeof(buf) - len, " cpu%d=cap:%s/max:%s", c, a, m);
+    }
+    L("%s\n", buf);
+}
+
+static void core_sample() {
+    g_um_prev = g_um_now;
+    int c = -1;
+    for (auto &u : g_um) {
+        if (u.second < 0) continue;
+        int x = core_of(u.second);
+        if (x >= 0) { c = x; break; }
+    }
+    g_um_now = c;
+    int r = sched_getcpu();
+    if (c >= 0 && c < NC) g_h_um[c]++;
+    if (r >= 0 && r < NC) g_h_rt[r]++;
+    g_h_n++;
+}
+
+static void core_freeze(long long frame, float ms, double t_s) {
+    int c = g_um_now;
+    if (c >= 0 && c < NC) g_h_fz[c]++;
+    L("CORE t=%.2f f=%lld ms=%.0f um=%d prev=%d um_khz=%d rt=%d\n",
+      t_s, frame, ms, c, g_um_prev, c >= 0 ? cpu_khz(c) : -1, sched_getcpu());
+}
+
+static int put_arr(char *b, size_t cap, const int *a) {
+    int len = 0;
+    for (int i = 0; i < NC; i++)
+        len += snprintf(b + len, cap - len, "%s%d", i ? "," : "", a[i]);
+    return len;
+}
+
+static void core_hist(double t_s) {
+    if (g_h_n <= 0) return;
+    char buf[300]; int len = snprintf(buf, sizeof buf, "CH t=%.1f n=%d um=", t_s, g_h_n);
+    len += put_arr(buf + len, sizeof(buf) - len, g_h_um);
+    len += snprintf(buf + len, sizeof(buf) - len, " rt=");
+    len += put_arr(buf + len, sizeof(buf) - len, g_h_rt);
+    len += snprintf(buf + len, sizeof(buf) - len, " umfz=");
+    put_arr(buf + len, sizeof(buf) - len, g_h_fz);
+    L("%s\n", buf);
+    memset(g_h_um, 0, sizeof g_h_um);
+    memset(g_h_rt, 0, sizeof g_h_rt);
+    memset(g_h_fz, 0, sizeof g_h_fz);
+    g_h_n = 0;
+}
+
 static bool read_cpu(int fd, int64_t &run, int64_t &wait) {
     char b[256];
     ssize_t n = pread(fd, b, sizeof(b) - 1, 0);
@@ -173,7 +277,6 @@ static bool read_cpu(int fd, int64_t &run, int64_t &wait) {
     wait = 0;
     return true;
 }
-
 static void th_init() {
     char path[64];
     snprintf(path, sizeof path, "/proc/self/task/%d/schedstat", (int)getpid());
@@ -186,11 +289,14 @@ static void th_init() {
         close(fd);
     }
     L("THR mode=%s\n", g_sched_mode == 1 ? "schedstat" : "stat");
+    if (g_core.load()) core_info();
 }
 
 static void th_rescan() {
     for (auto &t : g_thr) if (t.fd >= 0) close(t.fd);
     g_thr.clear();
+    for (auto &u : g_um) if (u.second >= 0) close(u.second);
+    g_um.clear();
     auto d = opendir("/proc/self/task");
     if (!d) return;
     std::vector<Thr> all;
@@ -216,6 +322,15 @@ static void th_rescan() {
         all.push_back(t);
     }
     closedir(d);
+    if (g_core.load()) {
+        for (auto &a : all) {
+            if (strcmp(a.name, "UnityMain") != 0 || g_um.size() >= 2) continue;
+            char sp[64];
+            snprintf(sp, sizeof sp, "/proc/self/task/%d/stat", (int)a.tid);
+            int sf = open(sp, O_RDONLY | O_CLOEXEC);
+            if (sf >= 0) g_um.push_back({a.tid, sf});
+        }
+    }
     g_nthr = (int)all.size();
     std::sort(all.begin(), all.end(), [](const Thr &a, const Thr &b) { return a.cur > b.cur; });
     pid_t me = getpid(), rt = g_rt.load();
@@ -314,6 +429,7 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
         if (th_on && g_sched_mode < 0) th_init();
         if (th_on && g_thr.empty()) th_rescan();
         if (th_on) th_snapshot();
+        if (th_on && g_core.load()) core_sample();
         int cc[2][K_N]; int64_t cn[2][K_N];
         for (int i = 0; i < 2; i++)
             for (int k = 0; k < K_N; k++) { cc[i][k] = c_cnt[i][k].exchange(0); cn[i][k] = c_ns[i][k].exchange(0); }
@@ -340,6 +456,7 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
                   cc[1][K_PBIN], cn[1][K_PBIN] / 1e6, cc[1][K_BUF], cn[1][K_BUF] / 1e6,
                   cc[1][K_TEX], cn[1][K_TEX] / 1e6);
                 if (th_on) th_log((long long)frame_no, ms, (t - g_t0.load()) / 1e9);
+                if (th_on && g_core.load()) core_freeze((long long)frame_no, ms, (t - g_t0.load()) / 1e9);
             }
         }
         if (ok) { ru_last = ru; ru_ok = true; }
@@ -356,13 +473,13 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
         L("FT fps=%.1f avg=%.1fms p50=%.1f p99=%.1f max=%.1f >33ms=%zu >50ms=%zu n=%zu cap=%d bias=%d scale=%d t=%.1f fz=%d\n",
           1000.0 * n / sum, sum / n, p50, p99, mx, s33, s50, n, cap, g_bias.load(), g_scale.load(),
           (t - g_t0.load()) / 1e9, win_fz);
+        if (g_fz.load() && g_th.load() && g_core.load()) core_hist((t - g_t0.load()) / 1e9);
         ft.clear();
         win_fz = 0;
         win_start = t;
     }
     return r;
 }
-
 /* ---------- Stage 4: render scale (liitan ang buffer ng window) ---------- */
 static std::atomic<int> g_fullw{1600}, g_fullh{720};   /* seed: native ng phone mo; lalaki lang, hindi liliit */
 static std::atomic<int> g_sbgn{0};
@@ -478,6 +595,15 @@ static void load_cfg() {
         f = fopen(THF, "w");
         if (f) { fprintf(f, "1\n"); fclose(f); }
     }
+    f = fopen(COREF, "r");
+    if (f) {
+        int v = 1;
+        if (fscanf(f, "%d", &v) == 1) g_core = v ? 1 : 0;
+        fclose(f);
+    } else {
+        f = fopen(COREF, "w");
+        if (f) { fprintf(f, "1\n"); fclose(f); }
+    }
 }
 
 /* mode.txt: 0 = walang ginagawa | 1 = thread lang | 2 = thread + hanap libunity (walang hook) | 3 = buong hook (polling) | 4 = hook sa mismong pag-load ng libunity (walang thread) */
@@ -562,7 +688,7 @@ static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
     std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
-    L("=== start v11 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load());
+    L("=== start v12 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load());
     int total = (mode == 1) ? 60 : 1200;
     for (int i = 0; i < total; i++) {
         if (mode >= 2) {
@@ -605,7 +731,7 @@ public:
         int mode = read_mode();
         if (mode == 4) {
             load_cfg();
-            L("=== start v11 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load());
+            L("=== start v12 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load());
             hook_nativeloader();
             return;
         }
