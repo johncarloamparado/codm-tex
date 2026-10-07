@@ -621,7 +621,7 @@ static void load_cfg() {
     FILE *f = fopen(CFGF, "r");
     if (f) {
         int v = 2;
-        if (fscanf(f, "%d", &v) == 1) g_bias = std::max(0, std::min(v, 4));
+        if (fscanf(f, "%d", &v) == 1) g_bias = std::max(0, std::min(v, 6));
         fclose(f);
     } else {
         f = fopen(CFGF, "w");
