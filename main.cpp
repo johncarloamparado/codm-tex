@@ -41,6 +41,7 @@
 #define FZF DIR "fz.txt"
 #define THF DIR "th.txt"
 #define COREF DIR "core.txt"
+#define NEARF DIR "near.txt"
 
 static std::mutex mu;
 static FILE *lf = nullptr;
@@ -64,6 +65,58 @@ static bool is_cmp(GLenum f) {
     return (f >= 0x9270 && f <= 0x9279) || (f >= 0x93b0 && f <= 0x93dd);
 }
 
+/* ---------- Stage 8: blocky texture (near.txt) ---------- */
+/* near.txt: 0 = patay | 1 = bukas (default). Epekto lang kapag bias.txt >= 1.
+   Ang mga texture na tinamaan ng bias ay pinipilit sa NEAREST filter = mosaic na block. */
+static std::atomic<int> g_near{1};
+static std::atomic<int> g_flagged{0}, g_forced{0}, g_smp{0};
+static const GLuint MAXTEX = 1u << 18;
+static std::atomic<uint8_t> g_tf[1u << 18];        /* 1 = texture na pinipilit NEAREST */
+static thread_local GLuint tl_bound[32];
+static thread_local int tl_unit = 0;
+
+static void (*o_act)(GLenum) = nullptr;
+static void h_act(GLenum u) {
+    int i = (int)u - 0x84C0;
+    tl_unit = (i >= 0 && i < 32) ? i : 0;
+    if (o_act) o_act(u);
+}
+
+static void (*o_bind)(GLenum, GLuint) = nullptr;
+static void h_bind(GLenum t, GLuint id) {
+    if (t == GL_TEXTURE_2D) tl_bound[tl_unit] = id;
+    if (o_bind) o_bind(t, id);
+}
+
+static void (*o_del)(GLsizei, const GLuint *) = nullptr;
+static void h_del(GLsizei n, const GLuint *ids) {
+    if (ids) {
+        for (GLsizei i = 0; i < n; i++) {
+            if (ids[i] < MAXTEX) g_tf[ids[i]] = 0;
+            for (int u = 0; u < 32; u++) if (tl_bound[u] == ids[i]) tl_bound[u] = 0;
+        }
+    }
+    if (o_del) o_del(n, ids);
+}
+
+static void h_tp(GLenum t, GLenum p, GLint v) {
+    if (t == GL_TEXTURE_2D && (p == GL_TEXTURE_MIN_FILTER || p == GL_TEXTURE_MAG_FILTER)) {
+        GLuint id = tl_bound[tl_unit];
+        if (id > 0 && id < MAXTEX && g_tf[id].load()) {
+            if (p == GL_TEXTURE_MAG_FILTER) v = GL_NEAREST;
+            else v = (v >= 0x2700 && v <= 0x2703) ? 0x2700 : GL_NEAREST;
+            g_forced++;
+        }
+    }
+    if (real_tp) real_tp(t, p, v);
+}
+
+static void (*o_smp)(GLuint, GLenum, GLint) = nullptr;
+static void h_smp(GLuint s, GLenum p, GLint v) {
+    g_smp++;
+    if (o_smp) o_smp(s, p, v);
+}
+
 static void (*o_st)(GLenum, GLsizei, GLenum, GLsizei, GLsizei) = nullptr;
 static void h_st(GLenum t, GLsizei lv, GLenum fmt, GLsizei w, GLsizei h) {
     if (o_st) o_st(t, lv, fmt, w, h);
@@ -72,6 +125,14 @@ static void h_st(GLenum t, GLsizei lv, GLenum fmt, GLsizei w, GLsizei h) {
         std::max(w, h) >= 512 && is_cmp(fmt)) {
         int base = std::min(b, (int)lv - 2);
         real_tp(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, base);
+        if (g_near.load()) {
+            GLuint id = tl_bound[tl_unit];
+            if (id > 0 && id < MAXTEX) {
+                g_tf[id] = 1; g_flagged++;
+                real_tp(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, 0x2700);
+                real_tp(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            }
+        }
         int n = ++g_applied;
         if (n <= 100 || n % 500 == 0)
             L("APPLIED #%d %dx%d lv=%d fmt=0x%x base=%d\n", n, w, h, lv, fmt, base);
@@ -473,6 +534,7 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
         L("FT fps=%.1f avg=%.1fms p50=%.1f p99=%.1f max=%.1f >33ms=%zu >50ms=%zu n=%zu cap=%d bias=%d scale=%d t=%.1f fz=%d\n",
           1000.0 * n / sum, sum / n, p50, p99, mx, s33, s50, n, cap, g_bias.load(), g_scale.load(),
           (t - g_t0.load()) / 1e9, win_fz);
+        if (g_near.load()) L("NEAR flagged=%d forced=%d smp=%d\n", g_flagged.load(), g_forced.load(), g_smp.load());
         if (g_fz.load() && g_th.load() && g_core.load()) core_hist((t - g_t0.load()) / 1e9);
         ft.clear();
         win_fz = 0;
@@ -519,7 +581,13 @@ static int32_t h_sbg(ANativeWindow *w, int32_t ww, int32_t hh, int32_t f) {
 
 static void *wrap(const char *n, void *r) {
     if (!n || !r) return r;
-    if (!strcmp(n, "glTexParameteri")) { if (!real_tp) real_tp = (decltype(real_tp))r; return r; }
+    if (!strcmp(n, "glTexParameteri")) { if (!real_tp) real_tp = (decltype(real_tp))r; return g_near.load() ? (void *)h_tp : r; }
+    if (g_near.load()) {
+        if (!strcmp(n, "glActiveTexture")) { if (!o_act) o_act = (decltype(o_act))r; return (void *)h_act; }
+        if (!strcmp(n, "glBindTexture")) { if (!o_bind) o_bind = (decltype(o_bind))r; return (void *)h_bind; }
+        if (!strcmp(n, "glDeleteTextures")) { if (!o_del) o_del = (decltype(o_del))r; return (void *)h_del; }
+        if (!strcmp(n, "glSamplerParameteri")) { if (!o_smp) o_smp = (decltype(o_smp))r; return (void *)h_smp; }
+    }
     if (!strcmp(n, "glTexStorage2D")) { if (!o_st) o_st = (decltype(o_st))r; return (void *)h_st; }
     if (!strcmp(n, "eglSwapBuffers")) { if (!o_swap) o_swap = (decltype(o_swap))r; return (void *)h_swap; }
     if (!strcmp(n, "eglCreateWindowSurface")) { if (!o_cws) o_cws = (decltype(o_cws))r; return (void *)h_cws; }
@@ -595,6 +663,15 @@ static void load_cfg() {
         f = fopen(THF, "w");
         if (f) { fprintf(f, "1\n"); fclose(f); }
     }
+    f = fopen(NEARF, "r");
+    if (f) {
+        int v = 1;
+        if (fscanf(f, "%d", &v) == 1) g_near = v ? 1 : 0;
+        fclose(f);
+    } else {
+        f = fopen(NEARF, "w");
+        if (f) { fprintf(f, "1\n"); fclose(f); }
+    }
     f = fopen(COREF, "r");
     if (f) {
         int v = 1;
@@ -625,6 +702,13 @@ static void reg_hooks(dev_t dv, ino_t in) {
     lsplt::RegisterHook(dv, in, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
     lsplt::RegisterHook(dv, in, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
     lsplt::RegisterHook(dv, in, "glTexStorage2D", (void *)h_st, (void **)&o_st);
+    if (g_near.load()) {
+        lsplt::RegisterHook(dv, in, "glTexParameteri", (void *)h_tp, (void **)&real_tp);
+        lsplt::RegisterHook(dv, in, "glActiveTexture", (void *)h_act, (void **)&o_act);
+        lsplt::RegisterHook(dv, in, "glBindTexture", (void *)h_bind, (void **)&o_bind);
+        lsplt::RegisterHook(dv, in, "glDeleteTextures", (void *)h_del, (void **)&o_del);
+        lsplt::RegisterHook(dv, in, "glSamplerParameteri", (void *)h_smp, (void **)&o_smp);
+    }
     lsplt::RegisterHook(dv, in, "eglSwapBuffers", (void *)h_swap, (void **)&o_swap);
     lsplt::RegisterHook(dv, in, "eglCreateWindowSurface", (void *)h_cws, (void **)&o_cws);
     lsplt::RegisterHook(dv, in, "ANativeWindow_setBuffersGeometry", (void *)h_sbg, (void **)&o_sbg);
@@ -688,7 +772,7 @@ static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
     std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
-    L("=== start v12 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load());
+    L("=== start v13 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load());
     int total = (mode == 1) ? 60 : 1200;
     for (int i = 0; i < total; i++) {
         if (mode >= 2) {
@@ -731,7 +815,7 @@ public:
         int mode = read_mode();
         if (mode == 4) {
             load_cfg();
-            L("=== start v12 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load());
+            L("=== start v13 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load());
             hook_nativeloader();
             return;
         }
