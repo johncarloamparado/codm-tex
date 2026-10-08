@@ -42,6 +42,7 @@
 #define THF DIR "th.txt"
 #define COREF DIR "core.txt"
 #define NEARF DIR "near.txt"
+#define BLKF DIR "blk.txt"
 
 static std::mutex mu;
 static FILE *lf = nullptr;
@@ -69,6 +70,7 @@ static bool is_cmp(GLenum f) {
 /* near.txt: 0 = patay | 1 = bukas (default). Epekto lang kapag bias.txt >= 1.
    Ang mga texture na tinamaan ng bias ay pinipilit sa NEAREST filter = mosaic na block. */
 static std::atomic<int> g_near{1};
+static std::atomic<int> g_blk{16};      /* blk.txt: target na laki (px) ng bawat texture; 0 = gamitin ang bias.txt */
 static std::atomic<int> g_flagged{0}, g_forced{0}, g_smp{0};
 static const GLuint MAXTEX = 1u << 18;
 static std::atomic<uint8_t> g_tf[1u << 18];        /* 1 = texture na pinipilit NEAREST */
@@ -104,7 +106,7 @@ static void h_tp(GLenum t, GLenum p, GLint v) {
         GLuint id = tl_bound[tl_unit];
         if (id > 0 && id < MAXTEX && g_tf[id].load()) {
             if (p == GL_TEXTURE_MAG_FILTER) v = GL_NEAREST;
-            else v = (v >= 0x2700 && v <= 0x2703) ? 0x2700 : GL_NEAREST;
+            else v = GL_NEAREST;
             g_forced++;
         }
     }
@@ -120,22 +122,29 @@ static void h_smp(GLuint s, GLenum p, GLint v) {
 static void (*o_st)(GLenum, GLsizei, GLenum, GLsizei, GLsizei) = nullptr;
 static void h_st(GLenum t, GLsizei lv, GLenum fmt, GLsizei w, GLsizei h) {
     if (o_st) o_st(t, lv, fmt, w, h);
-    int b = g_bias.load();
-    if (b > 0 && real_tp && t == GL_TEXTURE_2D && lv >= 4 &&
-        std::max(w, h) >= 512 && is_cmp(fmt)) {
-        int base = std::min(b, (int)lv - 2);
+    int b = g_bias.load(), k = g_blk.load();
+    int mx = std::max(w, h);
+    int base = 0;
+    if (k > 0) {
+        /* lahat ng texture (kahit anong laki) ay ibababa sa ~k px */
+        if (lv >= 3 && mx >= 64 && mx > k)
+            while ((mx >> (base + 1)) >= k && base < (int)lv - 2) base++;
+    } else if (b > 0 && lv >= 4 && mx >= 512) {
+        base = std::min(b, (int)lv - 2);
+    }
+    if (base > 0 && real_tp && t == GL_TEXTURE_2D && is_cmp(fmt)) {
         real_tp(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, base);
         if (g_near.load()) {
             GLuint id = tl_bound[tl_unit];
             if (id > 0 && id < MAXTEX) {
                 g_tf[id] = 1; g_flagged++;
-                real_tp(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, 0x2700);
+                real_tp(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
                 real_tp(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             }
         }
         int n = ++g_applied;
         if (n <= 100 || n % 500 == 0)
-            L("APPLIED #%d %dx%d lv=%d fmt=0x%x base=%d\n", n, w, h, lv, fmt, base);
+            L("APPLIED #%d %dx%d lv=%d fmt=0x%x base=%d blk=%d\n", n, w, h, lv, fmt, base, k);
     }
 }
 
@@ -672,6 +681,15 @@ static void load_cfg() {
         f = fopen(NEARF, "w");
         if (f) { fprintf(f, "1\n"); fclose(f); }
     }
+    f = fopen(BLKF, "r");
+    if (f) {
+        int v = 16;
+        if (fscanf(f, "%d", &v) == 1) g_blk = (v >= 4 && v <= 256) ? v : 0;
+        fclose(f);
+    } else {
+        f = fopen(BLKF, "w");
+        if (f) { fprintf(f, "16\n"); fclose(f); }
+    }
     f = fopen(COREF, "r");
     if (f) {
         int v = 1;
@@ -772,7 +790,7 @@ static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
     std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
-    L("=== start v13 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load());
+    L("=== start v14 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load());
     int total = (mode == 1) ? 60 : 1200;
     for (int i = 0; i < total; i++) {
         if (mode >= 2) {
@@ -815,7 +833,7 @@ public:
         int mode = read_mode();
         if (mode == 4) {
             load_cfg();
-            L("=== start v13 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load());
+            L("=== start v14 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load());
             hook_nativeloader();
             return;
         }
