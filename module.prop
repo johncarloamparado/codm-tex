@@ -1,6 +1,6 @@
 id=codm_tex_logger
 name=CODM Texture Logger
-version=v0.13
-versionCode=13
+version=v0.14
+versionCode=14
 author=me
-description=Stage 8 blocky texture (mode 4)
+description=Stage 8 blocky texture fixed size (mode 4)
