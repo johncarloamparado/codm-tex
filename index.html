@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CODM Texture</title>
+<style>
+:root{
+  --bg:#04050a; --glass:rgba(13,16,28,.66); --glass-solid:#0d101c; --line:rgba(255,255,255,.11);
+  --text:#eef1ff; --mute:#9aa4c4; --accent:#9db4ff; --accent2:#c8d6ff; --ink:#0a1230;
+  --warn:#ffd68a; --bad:#ff9a92; --ok:#9be8b9; --track:rgba(255,255,255,.14);
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;color:var(--text);background:transparent;
+  font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-tap-highlight-color:transparent}
+#stars{position:fixed;inset:0;width:100%;height:100%;z-index:-2;display:block}
+.spark{position:fixed;width:var(--s);height:var(--s);transform:translate(-50%,-50%);pointer-events:none;z-index:-1;
+  background:radial-gradient(circle,#fff 0 1.4px,rgba(255,255,255,.35) 2.2px,transparent 4px);
+  animation:tw var(--d) ease-in-out infinite alternate;animation-delay:var(--l)}
+.spark::before,.spark::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.spark::before{width:100%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.95),transparent)}
+.spark::after{width:1px;height:100%;background:linear-gradient(0deg,transparent,rgba(255,255,255,.95),transparent)}
+.spark.hero{--s:170px;opacity:.95}
+.spark.hero::before{height:2px;background:linear-gradient(90deg,transparent,rgba(255,90,90,.55) 28%,#fff 50%,rgba(90,140,255,.6) 72%,transparent)}
+.spark.hero::after{width:2px;background:linear-gradient(0deg,transparent,rgba(120,120,255,.55) 28%,#fff 50%,rgba(255,110,110,.5) 72%,transparent)}
+@keyframes tw{from{opacity:.35}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.spark{animation:none;opacity:.8}}
+
+main{max-width:560px;margin:0 auto;padding:22px 16px 40px;position:relative}
+header{padding:18px 4px 6px}
+h1{margin:0;font-size:30px;line-height:1.1;font-weight:300;letter-spacing:.01em}
+h1 b{font-weight:650}
+.status{margin-top:6px;color:var(--mute);font-size:14px}
+.card{margin-top:16px;padding:18px 16px;border-radius:24px;border:1px solid var(--line);
+  background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.card{background:var(--glass-solid)}}
+h2{margin:0 0 2px;font-size:18px;font-weight:600}
+.cap{margin:0 0 14px;color:var(--mute);font-size:13px}
+.row{margin-top:18px}
+.row:first-of-type{margin-top:4px}
+.rh{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.rh label,.rh .lb{font-weight:600;font-size:15px}
+.val{flex:none;padding:2px 12px;border-radius:999px;background:rgba(157,180,255,.14);color:var(--accent2);font-size:14px;font-weight:600;min-width:64px;text-align:center}
+.desc{margin:2px 0 8px;color:var(--mute);font-size:13px}
+
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:36px;margin:0;background:transparent;cursor:pointer;--p:50%}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:99px;
+  background:linear-gradient(90deg,var(--accent) var(--p),var(--track) var(--p))}
+input[type=range]::-moz-range-track{height:8px;border-radius:99px;background:var(--track)}
+input[type=range]::-moz-range-progress{height:8px;border-radius:99px;background:var(--accent)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-9px;border-radius:50%;
+  background:#fff;border:0;box-shadow:0 0 0 5px rgba(157,180,255,.22),0 0 14px rgba(157,180,255,.8)}
+input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#fff;border:0;
+  box-shadow:0 0 0 5px rgba(157,180,255,.22),0 0 14px rgba(157,180,255,.8)}
+input[type=range]:focus-visible{outline:2px solid var(--accent2);outline-offset:4px;border-radius:12px}
+input[type=range]:disabled{opacity:.4}
+
+.sw{display:flex;justify-content:space-between;align-items:center;gap:14px;width:100%;min-height:52px;padding:6px 0;
+  background:none;border:0;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.sw+.sw{border-top:1px solid var(--line)}
+.sw .t{font-weight:600;font-size:15px;display:block}
+.sw .d{display:block;color:var(--mute);font-size:13px;font-weight:400}
+.knob{flex:none;position:relative;width:50px;height:30px;border-radius:99px;background:var(--track);transition:background .15s}
+.knob::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw[aria-checked="true"] .knob{background:var(--accent)}
+.sw[aria-checked="true"] .knob::after{transform:translateX(20px)}
+.sw:focus-visible{outline:2px solid var(--accent2);outline-offset:2px;border-radius:12px}
+@media (prefers-reduced-motion:reduce){.knob,.knob::after{transition:none}}
+
+.cmp{position:relative;--x:50%;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:#000;
+  touch-action:pan-y;-webkit-user-select:none;user-select:none}
+#prev{display:block;width:100%;height:auto;aspect-ratio:16/9}
+.cmp .ln{position:absolute;top:0;bottom:0;left:var(--x);width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 10px rgba(0,0,0,.65);pointer-events:none}
+.cmp .hd{position:absolute;top:50%;left:var(--x);width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;border:0;padding:0;
+  background:#fff;color:#0a1230;font:700 15px/1 system-ui,sans-serif;box-shadow:0 0 14px rgba(0,0,0,.55);touch-action:none;cursor:ew-resize}
+.cmp .hd:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.cmp .tag{position:absolute;top:10px;padding:3px 11px;border-radius:99px;background:rgba(5,7,14,.72);color:#fff;font-size:12px;font-weight:600;pointer-events:none}
+.cmp .tl{left:10px}.cmp .tr{right:10px}
+.pnote{margin:8px 2px 0;color:var(--mute);font-size:12px}
+.btn{display:block;width:100%;min-height:50px;padding:10px 16px;font:inherit;font-weight:600;color:var(--text);
+  background:rgba(255,255,255,.07);border:1px solid var(--line);border-radius:16px;cursor:pointer}
+.btn.primary{background:linear-gradient(180deg,var(--accent2),var(--accent));color:var(--ink);border-color:transparent}
+.btn:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.btn:active{transform:scale(.985)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.stack{display:grid;gap:10px}
+.banner{margin-top:14px;padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:var(--glass);font-size:14px}
+.banner.warn{border-color:var(--warn);color:var(--warn)}
+.banner.bad{border-color:var(--bad);color:var(--bad)}
+.banner .btn{margin-top:10px;min-height:44px}
+.stat{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);color:var(--mute);font-size:13px}
+.foot{margin:22px 4px 0;color:var(--mute);font-size:13px;text-align:center}
+
+#toast{position:fixed;left:16px;right:16px;bottom:calc(18px + env(safe-area-inset-bottom,0px));max-width:528px;margin:0 auto;
+  padding:13px 16px;border-radius:18px;background:var(--text);color:#0a0d18;font-weight:600;font-size:14px;text-align:center;
+  opacity:0;transform:translateY(10px);pointer-events:none;transition:opacity .18s,transform .18s;z-index:30}
+#toast.show{opacity:1;transform:none}
+#logw{position:fixed;inset:0;z-index:20;display:none;padding:calc(16px + env(safe-area-inset-top,0px)) 14px calc(16px + env(safe-area-inset-bottom,0px));
+  background:rgba(2,3,8,.82)}
+#logw.open{display:flex;flex-direction:column;gap:10px}
+#logw pre{flex:1;margin:0;padding:12px;overflow:auto;border-radius:16px;border:1px solid var(--line);background:#06080f;
+  color:#cfd7f5;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="stars" aria-hidden="true"></canvas>
+<div id="sparks" aria-hidden="true"></div>
+
+<main>
+  <header>
+    <h1>CODM <b>Texture</b></h1>
+    <p class="status" id="status">Reading settings...</p>
+  </header>
+  <div id="banner"></div>
+
+  <section class="card">
+    <h2>Textures</h2>
+    <p class="cap">How blocky the game looks. Smaller blocks keep more detail.</p>
+    <div class="cmp" id="cmp">
+      <canvas id="prev" width="640" height="360" aria-label="Preview of the block size"></canvas>
+      <span class="tag tl">Original</span><span class="tag tr" id="tagR">Blocks</span>
+      <div class="ln"></div>
+      <button class="hd" id="hd" type="button" aria-label="Drag to compare original and blocky">&#8596;</button>
+    </div>
+    <p class="pnote">Drag the handle to compare. This is an approximate preview, real textures vary by surface.</p>
+    <div class="row">
+      <div class="rh"><label for="blk">Block size</label><span class="val" id="blkV">16</span></div>
+      <p class="desc" id="blkD">Every texture is reduced to about this many pixels.</p>
+      <input type="range" id="blk" min="0" max="5" step="1" value="3">
+    </div>
+    <button class="sw" id="near" role="switch" aria-checked="true" type="button">
+      <span><span class="t">Hard pixel edges</span><span class="d">Sharp squares instead of a blur between blocks</span></span><span class="knob"></span>
+    </button>
+  </section>
+
+  <section class="card">
+    <h2>Display</h2>
+    <p class="cap">Lower values are lighter on the phone but less sharp.</p>
+    <div class="row">
+      <div class="rh"><label for="scale">Render scale</label><span class="val" id="scaleV">100%</span></div>
+      <p class="desc">Resolution of the game picture.</p>
+      <input type="range" id="scale" min="40" max="100" step="5" value="100">
+    </div>
+    <div class="row">
+      <div class="rh"><label for="fps">Frame rate cap</label><span class="val" id="fpsV">Off</span></div>
+      <p class="desc">Limits frames per second. Off lets the game decide.</p>
+      <input type="range" id="fps" min="0" max="7" step="1" value="0">
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Logging</h2>
+    <p class="cap">Writes codm_tex.log so we can find the cause of stutter.</p>
+    <button class="sw" id="fz" role="switch" aria-checked="true" type="button">
+      <span><span class="t">Freeze log</span><span class="d">Records every frame that takes over 100 ms</span></span><span class="knob"></span>
+    </button>
+    <button class="sw" id="th" role="switch" aria-checked="true" type="button">
+      <span><span class="t">Thread log</span><span class="d">Shows which threads were busy during a freeze</span></span><span class="knob"></span>
+    </button>
+    <button class="sw" id="core" role="switch" aria-checked="true" type="button">
+      <span><span class="t">Core log</span><span class="d">Needs both logs above</span></span><span class="knob"></span>
+    </button>
+    <p class="stat" id="stat">No frame data yet.</p>
+  </section>
+
+  <section class="card">
+    <h2>Tools</h2>
+    <div class="stack" style="margin-top:12px">
+      <button class="btn primary" id="stop" type="button">Apply for CODM</button>
+      <div class="grid2" style="margin-top:0">
+        <button class="btn" id="vlog" type="button">View log</button>
+        <button class="btn" id="clr" type="button">Clear log</button>
+      </div>
+      <button class="btn" id="reset" type="button">Reset to recommended</button>
+    </div>
+  </section>
+
+  <p class="foot">Changes apply the next time CODM starts.</p>
+</main>
+
+<div id="logw" role="dialog" aria-modal="true" aria-label="Log">
+  <pre id="logt"></pre>
+  <button class="btn" id="logx" type="button">Close</button>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  var D = "/data/data/com.garena.game.codm/files";
+  var PKG = "com.garena.game.codm";
+  var BLK = [0, 64, 32, 16, 8, 4];
+  var BLKN = ["Off", "Soft", "Fine", "Medium", "Chunky", "Extreme"];
+  var BLKCOLS = [160, 80, 48, 28, 16, 9];
+  var FPS = [0, 30, 40, 45, 60, 72, 90, 120];
+  var REC = {blk:16, bias:0, near:1, scale:0, fps:0, fz:1, th:1, core:1};
+
+  var demo = (typeof ksu === "undefined");
+  var fake = {blk:"16", bias:"0", near:"1", scale:"0", fps:"0", fz:"1", th:"1", core:"1", mode:"4", ft:"FT fps=55.2 avg=18.1ms n=276 fz=1"};
+  var seq = 0, cfg = {};
+
+  function $(id){ return document.getElementById(id); }
+  function toast(m){ var e = $("toast"); e.textContent = m; e.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(function(){ e.classList.remove("show"); }, 2400); }
+
+  /* ---------- background ---------- */
+  function rng(seed){ return function(){ seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
+  function drawStars(){
+    var c = $("stars"), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = window.innerWidth, h = window.innerHeight;
+    c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    var x = c.getContext("2d"); x.scale(dpr, dpr);
+    x.fillStyle = "#04050a"; x.fillRect(0, 0, w, h);
+    var r = rng(20260), n = Math.round(w * h / 1700), i;
+    for (i = 0; i < n; i++){
+      var px = r() * w, py = r() * h, s = r(), a = .25 + r() * .75;
+      var rad = s > .97 ? 1.5 : (s > .8 ? 1.0 : .6);
+      var tint = r();
+      x.fillStyle = tint > .85 ? "rgba(190,205,255," + a + ")" : (tint < .08 ? "rgba(255,225,200," + a + ")" : "rgba(255,255,255," + a + ")");
+      x.beginPath(); x.arc(px, py, rad, 0, 6.2832); x.fill();
+    }
+  }
+  function makeSparks(){
+    var box = $("sparks"), r = rng(77), i, el;
+    box.innerHTML = "";
+    el = document.createElement("div"); el.className = "spark hero";
+    el.style.left = "84%"; el.style.top = "6%"; el.style.setProperty("--d", "5s"); el.style.setProperty("--l", "0s");
+    box.appendChild(el);
+    for (i = 0; i < 16; i++){
+      el = document.createElement("div"); el.className = "spark";
+      el.style.left = (r() * 100) + "%"; el.style.top = (r() * 100) + "%";
+      el.style.setProperty("--s", (14 + r() * 22) + "px");
+      el.style.setProperty("--d", (2.4 + r() * 3.6) + "s");
+      el.style.setProperty("--l", (-r() * 6) + "s");
+      box.appendChild(el);
+    }
+  }
+  drawStars(); makeSparks();
+  var rz; window.addEventListener("resize", function(){ clearTimeout(rz); rz = setTimeout(drawStars, 200); });
+
+  /* ---------- shell ---------- */
+  function sh(cmd){
+    return new Promise(function(resolve){
+      if (demo){ resolve({errno:0, stdout:"", stderr:"", demo:true}); return; }
+      var name = "cb_" + Date.now() + "_" + (seq++), done = false;
+      function fin(r){ if (done) return; done = true; try{ delete window[name]; }catch(e){ window[name] = undefined; } resolve(r); }
+      window[name] = function(errno, stdout, stderr){ fin({errno:errno, stdout:String(stdout||""), stderr:String(stderr||"")}); };
+      setTimeout(function(){ fin({errno:-3, stdout:"", stderr:"timeout"}); }, 8000);
+      try { ksu.exec(cmd, "{}", name); } catch(e){ fin({errno:-2, stdout:"", stderr:String(e)}); }
+    });
+  }
+  function readState(){
+    if (demo) return Promise.resolve(Object.assign({}, fake));
+    var cmd = "D=" + D + "; [ -d $D ] || { echo NODIR; exit 0; }; " +
+      "for f in blk bias near scale fps fz th core mode; do echo $f=$(cat $D/$f.txt 2>/dev/null); done; " +
+      "echo ft=$(grep '^FT' $D/codm_tex.log 2>/dev/null | tail -n 1)";
+    return sh(cmd).then(function(r){
+      if (r.stdout.indexOf("NODIR") >= 0) return {nodir:true};
+      var o = {};
+      r.stdout.split("\n").forEach(function(l){ var i = l.indexOf("="); if (i > 0) o[l.slice(0,i).trim()] = l.slice(i+1).trim(); });
+      if (r.errno !== 0 && !Object.keys(o).length) o.err = r.stderr || ("errno " + r.errno);
+      return o;
+    });
+  }
+  function writeFiles(map){
+    if (demo){ Object.keys(map).forEach(function(k){ fake[k] = String(map[k]); }); return Promise.resolve({ok:true, demo:true}); }
+    var cmd = "D=" + D + "; [ -d $D ] || { echo NODIR; exit 1; }; ";
+    Object.keys(map).forEach(function(k){
+      cmd += "echo " + parseInt(map[k], 10) + " > $D/" + k + ".txt; chmod 666 $D/" + k + ".txt 2>/dev/null; ";
+    });
+    cmd += "echo OK";
+    return sh(cmd).then(function(r){ r.ok = r.stdout.indexOf("OK") >= 0; return r; });
+  }
+  function save(map, label){
+    return writeFiles(map).then(function(r){
+      toast(r.ok ? (label + " saved") : "Could not save. Open CODM once first.");
+      return r;
+    });
+  }
+
+  /* ---------- preview ---------- */
+  var PW = 640, PH = 360, orig = null, origData = null, mosaics = {}, curIdx = 3, pos = 0.5;
+  function buildScene(){
+    var c = document.createElement("canvas"); c.width = PW; c.height = PH;
+    var x = c.getContext("2d"), i, j, g;
+    var HZ = 196;
+    /* sky + clouds through the glass roof */
+    g = x.createLinearGradient(0, 0, 0, HZ); g.addColorStop(0, "#4f86c6"); g.addColorStop(1, "#cfe3f5");
+    x.fillStyle = g; x.fillRect(0, 0, PW, HZ);
+    x.fillStyle = "rgba(255,255,255,.75)";
+    for (i = 0; i < 9; i++){ x.beginPath(); x.ellipse(40 + i * 72, 40 + (i % 3) * 22, 46, 13, 0, 0, 6.3); x.fill(); }
+    /* roof beams */
+    x.strokeStyle = "#3b3f4a"; x.lineWidth = 4;
+    for (i = 0; i <= 8; i++){ x.beginPath(); x.moveTo(PW / 2 + (i - 4) * 18, 0); x.lineTo(PW / 2 + (i - 4) * 90, 120); x.stroke(); }
+    x.lineWidth = 3; x.beginPath(); x.moveTo(0, 60); x.lineTo(PW, 60); x.stroke();
+    /* far wall with windows and a sign */
+    x.fillStyle = "#b9a58d"; x.fillRect(150, 112, 340, HZ - 112);
+    for (i = 0; i < 6; i++){ x.fillStyle = "#7fa9d1"; x.fillRect(162 + i * 56, 122, 44, 40); x.fillStyle = "#e9eef3"; x.fillRect(162 + i * 56, 140, 44, 3); }
+    x.fillStyle = "#1d3a5c"; x.fillRect(250, 98, 140, 20);
+    x.fillStyle = "#f2f5f8";
+    for (i = 0; i < 9; i++) x.fillRect(258 + i * 14, 104, 9, 3), x.fillRect(258 + i * 14, 110, 6, 2);
+    /* floor with perspective checkers */
+    var img = x.getImageData(0, HZ, PW, PH - HZ), d = img.data, y, xx, dy, u, v, k, a1, shade, o;
+    for (y = HZ; y < PH; y++){
+      dy = y - HZ + 4;
+      for (xx = 0; xx < PW; xx++){
+        u = (xx - PW / 2) * 0.55 / dy * 3.2; v = 190 / dy;
+        k = (Math.floor(u) + Math.floor(v)) & 1;
+        shade = Math.min(1, 0.45 + dy / 160);
+        o = ((y - HZ) * PW + xx) * 4;
+        a1 = k ? 36 : 214;
+        d[o] = a1 * shade + 150 * (1 - shade); d[o + 1] = a1 * shade + 155 * (1 - shade); d[o + 2] = (a1 + 4) * shade + 165 * (1 - shade); d[o + 3] = 255;
+      }
+    }
+    x.putImageData(img, 0, HZ);
+    /* pillars with shading */
+    function pillar(px, w, top){
+      var gg = x.createLinearGradient(px, 0, px + w, 0);
+      gg.addColorStop(0, "#8e8398"); gg.addColorStop(.5, "#d9d4de"); gg.addColorStop(1, "#6e6678");
+      x.fillStyle = gg; x.fillRect(px, top, w, HZ + 70 - top);
+      x.fillStyle = "#2b2733"; x.fillRect(px, top + 70, w, 16);
+      x.fillStyle = "#4a3f6b"; x.fillRect(px, top + 24, w, 10);
+    }
+    pillar(36, 62, 0); pillar(520, 74, 0);
+    /* orange crate, plant, bench */
+    x.fillStyle = "#d9692c"; x.fillRect(190, 176, 54, 34); x.fillStyle = "#a94d1d"; x.fillRect(190, 176, 54, 5);
+    x.strokeStyle = "#7a3510"; x.lineWidth = 1; x.strokeRect(190.5, 176.5, 53, 33);
+    x.fillStyle = "#6b4a2e"; x.fillRect(402, 190, 18, 20);
+    x.fillStyle = "#2f8a3d";
+    for (i = 0; i < 8; i++){ x.beginPath(); x.ellipse(411 + Math.cos(i) * 20, 176 - i * 3, 16, 5, i * 0.7, 0, 6.3); x.fill(); }
+    for (j = 0; j < 5; j++){ x.fillStyle = "#c28a3d"; x.fillRect(268 + j * 20, 188, 14, 16); x.fillStyle = "#5c4220"; x.fillRect(268 + j * 20, 204, 14, 3); }
+    /* fine details: railing, text lines, stripes */
+    x.strokeStyle = "#e8e8ee"; x.lineWidth = 1;
+    for (i = 0; i < 28; i++){ x.beginPath(); x.moveTo(110 + i * 3, 214); x.lineTo(110 + i * 3, 240); x.stroke(); }
+    x.fillStyle = "#e3b341"; x.fillRect(100, 236, 440, 4);
+    x.fillStyle = "#ffffff";
+    for (i = 0; i < 6; i++) x.fillRect(560 + (i % 2) * 8, 220 + i * 8, 40 - (i % 3) * 8, 2);
+    return c;
+  }
+  /* sariling screenshot: webroot/img/off.jpg, 64.jpg, 32.jpg, 16.jpg, 8.jpg, 4.jpg (.png puwede rin) */
+  var PICN = ["off", "64", "32", "16", "8", "4"], PICS = {}, COV = {};
+  function cover(im){
+    var c = document.createElement("canvas"); c.width = PW; c.height = PH;
+    var r = Math.max(PW / im.width, PH / im.height), w = im.width * r, h = im.height * r;
+    c.getContext("2d").drawImage(im, (PW - w) / 2, (PH - h) / 2, w, h); return c;
+  }
+  function cov(i){ if (!COV[i] && PICS[i]) COV[i] = cover(PICS[i]); return COV[i]; }
+  function loadPic(i, ext){
+    var im = new Image();
+    im.onload = function(){
+      PICS[i] = im; COV[i] = null;
+      if (i === 0){ orig = null; mosaics = {}; }
+      drawPreview();
+    };
+    im.onerror = function(){ if (ext === "jpg") loadPic(i, "png"); };
+    im.src = "img/" + PICN[i] + "." + ext;
+  }
+  function mosaic(idx){
+    if (!origData) return orig;
+    if (mosaics[idx]) return mosaics[idx];
+    var cols = BLKCOLS[idx], cw = PW / cols, rows = Math.ceil(PH / cw);
+    var c = document.createElement("canvas"); c.width = PW; c.height = PH;
+    var x = c.getContext("2d"), r, q, x0, x1, y0, y1, px, py, sr, sg, sb, n, o, dd = origData.data;
+    for (r = 0; r < rows; r++){
+      y0 = Math.round(r * cw); y1 = Math.min(PH, Math.round((r + 1) * cw));
+      for (q = 0; q < cols; q++){
+        x0 = Math.round(q * cw); x1 = Math.min(PW, Math.round((q + 1) * cw));
+        sr = sg = sb = n = 0;
+        for (py = y0; py < y1; py++) for (px = x0; px < x1; px++){ o = (py * PW + px) * 4; sr += dd[o]; sg += dd[o + 1]; sb += dd[o + 2]; n++; }
+        if (!n) continue;
+        x.fillStyle = "rgb(" + Math.round(sr / n) + "," + Math.round(sg / n) + "," + Math.round(sb / n) + ")";
+        x.fillRect(x0, y0, x1 - x0, y1 - y0);
+      }
+    }
+    mosaics[idx] = c; return c;
+  }
+  function drawPreview(){
+    if (!orig){
+      orig = PICS[0] ? cov(0) : buildScene();
+      try { origData = orig.getContext("2d").getImageData(0, 0, PW, PH); } catch (e) { origData = null; }
+    }
+    var cv = $("prev"), c = cv.getContext("2d"), sx = Math.round(pos * PW);
+    c.drawImage(orig, 0, 0);
+    c.save(); c.beginPath(); c.rect(sx, 0, PW - sx, PH); c.clip();
+    c.drawImage(curIdx === 0 ? orig : (PICS[curIdx] ? cov(curIdx) : mosaic(curIdx)), 0, 0);
+    c.restore();
+  }
+  function setPos(f){ pos = Math.max(0.04, Math.min(0.96, f)); $("cmp").style.setProperty("--x", (pos * 100) + "%"); drawPreview(); }
+  (function(){
+    var cmp = $("cmp"), hd = $("hd"), drag = false;
+    function fromEv(e){ var r = cmp.getBoundingClientRect(); setPos((e.clientX - r.left) / r.width); }
+    hd.addEventListener("pointerdown", function(e){ drag = true; try{ hd.setPointerCapture(e.pointerId); }catch(_){} fromEv(e); e.preventDefault(); });
+    hd.addEventListener("pointermove", function(e){ if (drag) fromEv(e); });
+    hd.addEventListener("pointerup", function(){ drag = false; });
+    hd.addEventListener("pointercancel", function(){ drag = false; });
+    hd.addEventListener("keydown", function(e){ if (e.key === "ArrowLeft") setPos(pos - .05); else if (e.key === "ArrowRight") setPos(pos + .05); });
+    cmp.addEventListener("click", function(e){ if (e.target !== hd) fromEv(e); });
+  })();
+
+  /* ---------- UI helpers ---------- */
+  function fill(el){ var p = (el.value - el.min) / (el.max - el.min) * 100; el.style.setProperty("--p", p + "%"); }
+  function setSw(id, on){ $(id).setAttribute("aria-checked", on ? "true" : "false"); }
+  function getSw(id){ return $(id).getAttribute("aria-checked") === "true"; }
+  function blkLabel(i){ return BLK[i] ? String(BLK[i]) : "Off"; }
+  function blkIdx(v){ var best = 0, d = 1e9, i; if (v <= 0) return 0; for (i = 1; i < BLK.length; i++){ var dd = Math.abs(BLK[i] - v); if (dd < d){ d = dd; best = i; } } return best; }
+  function fpsIdx(v){ var i = FPS.indexOf(v); return i < 0 ? 0 : i; }
+
+  function updateTexUI(){
+    var i = parseInt($("blk").value, 10);
+    curIdx = i;
+    $("blkV").textContent = blkLabel(i);
+    $("blkD").textContent = i === 0 ? "Off. Textures stay original." :
+      BLKN[i] + ": every texture is reduced to about " + BLK[i] + " pixels.";
+    $("tagR").textContent = i === 0 ? "Off" : "Blocks";
+    drawPreview(); fill($("blk"));
+  }
+  function updateStatus(){
+    var i = parseInt($("blk").value, 10), s = parseInt($("scale").value, 10), f = FPS[parseInt($("fps").value, 10)];
+    $("status").textContent = "Block size " + blkLabel(i) + ", scale " + s + "%, " + (f ? f + " fps cap" : "no fps cap");
+  }
+
+  function render(s){
+    cfg = s;
+    var ban = $("banner"); ban.innerHTML = "";
+    function banner(cls, text, btn){
+      var d = document.createElement("div"); d.className = "banner " + cls; d.textContent = text;
+      if (btn){ var b = document.createElement("button"); b.className = "btn"; b.type = "button"; b.textContent = btn.label; b.addEventListener("click", btn.fn); d.appendChild(b); }
+      ban.appendChild(d);
+    }
+    if (demo) banner("warn", "Preview only. Open this page inside SukiSU Ultra (Module, then WebUI) to change real settings.");
+    if (s.nodir){
+      $("status").textContent = "No settings found yet.";
+      banner("bad", "The game folder is missing. Open CODM once with mode.txt set to 4, then reopen this page.");
+      return;
+    }
+    if (s.err) banner("bad", "Could not read settings: " + s.err);
+    if (!demo && s.mode !== undefined && s.mode !== "4"){
+      banner("warn", "mode.txt is " + (s.mode || "empty") + ". It must be 4 for the module to work.",
+        {label:"Set to 4", fn:function(){ save({mode:4}, "Mode").then(refresh); }});
+    }
+    var blk = parseInt(s.blk, 10) || 0, sc = parseInt(s.scale, 10) || 0, f = parseInt(s.fps, 10) || 0;
+    $("blk").value = blkIdx(blk);
+    $("scale").value = sc >= 40 && sc <= 99 ? sc : 100;
+    $("fps").value = fpsIdx(f);
+    if (!demo && (parseInt(s.bias, 10) || 0) > 0) writeFiles({bias:0});   /* walang mip bias na sumasabay sa block size */
+    setSw("near", s.near !== "0"); setSw("fz", s.fz !== "0"); setSw("th", s.th !== "0"); setSw("core", s.core !== "0");
+    $("scaleV").textContent = $("scale").value + "%"; fill($("scale"));
+    $("fpsV").textContent = f ? FPS[$("fps").value] : "Off"; fill($("fps"));
+    updateTexUI(); updateStatus();
+    var m = /fps=([\d.]+)/.exec(s.ft || ""), z = /fz=(\d+)/.exec(s.ft || "");
+    $("stat").textContent = m ? ("Last logged: " + Math.round(parseFloat(m[1])) + " fps" + (z ? ", " + z[1] + " freeze" + (z[1] === "1" ? "" : "s") + " in that 5 s window" : "")) : "No frame data yet.";
+  }
+  function refresh(){ return readState().then(render); }
+
+  /* ---------- events ---------- */
+  $("blk").addEventListener("input", function(){ updateTexUI(); updateStatus(); });
+  $("blk").addEventListener("change", function(){
+    var i = parseInt($("blk").value, 10), m = {blk:BLK[i], bias:0}; if (BLK[i]) m.near = getSw("near") ? 1 : 0;
+    save(m, "Block size");
+  });
+  $("near").addEventListener("click", function(){ var on = !getSw("near"); setSw("near", on); save({near:on ? 1 : 0}, "Pixel edges"); });
+  $("scale").addEventListener("input", function(){ $("scaleV").textContent = $("scale").value + "%"; fill($("scale")); updateStatus(); });
+  $("scale").addEventListener("change", function(){ var v = parseInt($("scale").value, 10); save({scale:v >= 100 ? 0 : v}, "Render scale"); });
+  $("fps").addEventListener("input", function(){ var f = FPS[parseInt($("fps").value, 10)]; $("fpsV").textContent = f ? f : "Off"; fill($("fps")); updateStatus(); });
+  $("fps").addEventListener("change", function(){ save({fps:FPS[parseInt($("fps").value, 10)]}, "Frame rate cap"); });
+  ["fz", "th", "core"].forEach(function(k){
+    $(k).addEventListener("click", function(){ var on = !getSw(k), m = {}; setSw(k, on); m[k] = on ? 1 : 0; save(m, k === "fz" ? "Freeze log" : (k === "th" ? "Thread log" : "Core log")); });
+  });
+
+  $("stop").addEventListener("click", function(){
+    sh("am force-stop " + PKG).then(function(r){ toast(demo ? "Demo: nothing stopped" : (r.errno === 0 ? "CODM stopped. Open it again to apply." : "Could not stop CODM")); });
+  });
+  $("clr").addEventListener("click", function(){
+    sh("rm -f " + D + "/codm_tex.log").then(function(r){ toast(demo ? "Demo: nothing deleted" : (r.errno === 0 ? "Log cleared" : "Could not clear the log")); refresh(); });
+  });
+  $("vlog").addEventListener("click", function(){
+    $("logt").textContent = "Loading...";
+    $("logw").classList.add("open");
+    if (demo){ $("logt").textContent = "Demo mode. The last lines of codm_tex.log appear here."; return; }
+    sh("tail -n 80 " + D + "/codm_tex.log 2>&1").then(function(r){ $("logt").textContent = r.stdout.trim() || "The log is empty."; $("logt").scrollTop = $("logt").scrollHeight; });
+  });
+  $("logx").addEventListener("click", function(){ $("logw").classList.remove("open"); });
+  $("reset").addEventListener("click", function(){ save(REC, "Recommended settings").then(refresh); });
+
+  PICN.forEach(function(n, i){ loadPic(i, "jpg"); });
+  refresh();
+})();
+</script>
+</body>
+</html>
