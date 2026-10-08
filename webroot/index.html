@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CODM Texture</title>
+<title>CODM Blocky Textures</title>
 <style>
 :root{
   --bg:#04050a; --glass:rgba(13,16,28,.66); --glass-solid:#0d101c; --line:rgba(255,255,255,.11);
@@ -36,6 +36,7 @@ header{padding:18px 4px 6px}
 h1{margin:0;font-size:30px;line-height:1.1;font-weight:300;letter-spacing:.01em}
 h1 b{font-weight:650}
 .status{margin-top:6px;color:var(--mute);font-size:14px}
+.by{margin:2px 0 0;color:var(--accent2);font-size:13px;opacity:.85}
 .card{margin-top:16px;padding:18px 16px;border-radius:24px;border:1px solid var(--line);
   background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.card{background:var(--glass-solid)}}
@@ -48,7 +49,10 @@ h2{margin:0 0 2px;font-size:18px;font-weight:600}
 .val{flex:none;padding:2px 12px;border-radius:999px;background:rgba(157,180,255,.14);color:var(--accent2);font-size:14px;font-weight:600;min-width:64px;text-align:center}
 .desc{margin:2px 0 8px;color:var(--mute);font-size:13px}
 
-input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:36px;margin:0;background:transparent;cursor:pointer;--p:50%}
+.sl{position:relative;--f:0}
+.grab{position:absolute;top:50%;left:calc(13px + (100% - 26px) * var(--f));width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;touch-action:none;cursor:grab;z-index:1}
+.grab:active{cursor:grabbing}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:36px;margin:0;background:transparent;pointer-events:none;--p:50%}
 input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:99px;
   background:linear-gradient(90deg,var(--accent) var(--p),var(--track) var(--p))}
 input[type=range]::-moz-range-track{height:8px;border-radius:99px;background:var(--track)}
@@ -114,8 +118,9 @@ input[type=range]:disabled{opacity:.4}
 
 <main>
   <header>
-    <h1>CODM <b>Texture</b></h1>
+    <h1>CODM <b>Blocky Textures</b></h1>
     <p class="status" id="status">Reading settings...</p>
+    <p class="by">by Q9 Papyrus</p>
   </header>
   <div id="banner"></div>
 
@@ -134,9 +139,6 @@ input[type=range]:disabled{opacity:.4}
       <p class="desc" id="blkD">Every texture is reduced to about this many pixels.</p>
       <input type="range" id="blk" min="0" max="5" step="1" value="3">
     </div>
-    <button class="sw" id="near" role="switch" aria-checked="true" type="button">
-      <span><span class="t">Hard pixel edges</span><span class="d">Sharp squares instead of a blur between blocks</span></span><span class="knob"></span>
-    </button>
   </section>
 
   <section class="card">
@@ -175,9 +177,13 @@ input[type=range]:disabled{opacity:.4}
       <button class="btn primary" id="stop" type="button">Apply for CODM</button>
       <div class="grid2" style="margin-top:0">
         <button class="btn" id="vlog" type="button">View log</button>
-        <button class="btn" id="clr" type="button">Clear log</button>
+        <button class="btn" id="exp" type="button">Export full log</button>
       </div>
-      <button class="btn" id="reset" type="button">Reset to recommended</button>
+      <div class="grid2" style="margin-top:0">
+        <button class="btn" id="clr" type="button">Clear log</button>
+        <button class="btn" id="reset" type="button">Reset defaults</button>
+      </div>
+      <p class="pnote" style="margin-top:2px">Export log saves one file to <b>CODM Log/codm_tex.log</b> in your internal storage and replaces the old one.</p>
     </div>
   </section>
 
@@ -402,7 +408,7 @@ input[type=range]:disabled{opacity:.4}
   })();
 
   /* ---------- UI helpers ---------- */
-  function fill(el){ var p = (el.value - el.min) / (el.max - el.min) * 100; el.style.setProperty("--p", p + "%"); }
+  function fill(el){ var f = (el.value - el.min) / (el.max - el.min); el.style.setProperty("--p", (f * 100) + "%"); if (el.parentNode) el.parentNode.style.setProperty("--f", f); }
   function setSw(id, on){ $(id).setAttribute("aria-checked", on ? "true" : "false"); }
   function getSw(id){ return $(id).getAttribute("aria-checked") === "true"; }
   function blkLabel(i){ return BLK[i] ? String(BLK[i]) : "Off"; }
@@ -447,7 +453,8 @@ input[type=range]:disabled{opacity:.4}
     $("scale").value = sc >= 40 && sc <= 99 ? sc : 100;
     $("fps").value = fpsIdx(f);
     if (!demo && (parseInt(s.bias, 10) || 0) > 0) writeFiles({bias:0});   /* walang mip bias na sumasabay sa block size */
-    setSw("near", s.near !== "0"); setSw("fz", s.fz !== "0"); setSw("th", s.th !== "0"); setSw("core", s.core !== "0");
+    if (!demo && s.near !== "1") writeFiles({near:1});   /* laging naka-on ang hard pixel edges */
+    setSw("fz", s.fz !== "0"); setSw("th", s.th !== "0"); setSw("core", s.core !== "0");
     $("scaleV").textContent = $("scale").value + "%"; fill($("scale"));
     $("fpsV").textContent = f ? FPS[$("fps").value] : "Off"; fill($("fps"));
     updateTexUI(); updateStatus();
@@ -459,10 +466,9 @@ input[type=range]:disabled{opacity:.4}
   /* ---------- events ---------- */
   $("blk").addEventListener("input", function(){ updateTexUI(); updateStatus(); });
   $("blk").addEventListener("change", function(){
-    var i = parseInt($("blk").value, 10), m = {blk:BLK[i], bias:0}; if (BLK[i]) m.near = getSw("near") ? 1 : 0;
+    var i = parseInt($("blk").value, 10), m = {blk:BLK[i], bias:0, near:1};
     save(m, "Block size");
   });
-  $("near").addEventListener("click", function(){ var on = !getSw("near"); setSw("near", on); save({near:on ? 1 : 0}, "Pixel edges"); });
   $("scale").addEventListener("input", function(){ $("scaleV").textContent = $("scale").value + "%"; fill($("scale")); updateStatus(); });
   $("scale").addEventListener("change", function(){ var v = parseInt($("scale").value, 10); save({scale:v >= 100 ? 0 : v}, "Render scale"); });
   $("fps").addEventListener("input", function(){ var f = FPS[parseInt($("fps").value, 10)]; $("fpsV").textContent = f ? f : "Off"; fill($("fps")); updateStatus(); });
@@ -485,6 +491,41 @@ input[type=range]:disabled{opacity:.4}
   });
   $("logx").addEventListener("click", function(){ $("logw").classList.remove("open"); });
   $("reset").addEventListener("click", function(){ save(REC, "Recommended settings").then(refresh); });
+
+  /* sliders: hindi gumagalaw sa simpleng tap sa track; ang bilog lang ang puwedeng i-drag */
+  Array.prototype.forEach.call(document.querySelectorAll("input[type=range]"), function(el){
+    var w = document.createElement("div"); w.className = "sl";
+    el.parentNode.insertBefore(w, el); w.appendChild(el);
+    var g = document.createElement("span"); g.className = "grab"; w.appendChild(g);
+    var drag = false, off = 0;
+    function frac(){ return (el.value - el.min) / (el.max - el.min); }
+    function center(){ var r = el.getBoundingClientRect(); return r.left + 13 + frac() * (r.width - 26); }
+    function move(e){
+      var r = el.getBoundingClientRect(), mn = +el.min, mx = +el.max, st = +el.step || 1;
+      var f = (e.clientX - off - r.left - 13) / (r.width - 26); f = Math.max(0, Math.min(1, f));
+      var v = mn + Math.round(f * (mx - mn) / st) * st;
+      if (String(v) !== el.value){ el.value = v; el.dispatchEvent(new Event("input", {bubbles:true})); }
+    }
+    g.addEventListener("pointerdown", function(e){ drag = true; off = e.clientX - center(); try{ g.setPointerCapture(e.pointerId); }catch(_){} e.preventDefault(); });
+    g.addEventListener("pointermove", function(e){ if (drag) move(e); });
+    function end(){ if (!drag) return; drag = false; el.dispatchEvent(new Event("change", {bubbles:true})); }
+    g.addEventListener("pointerup", end);
+    g.addEventListener("pointercancel", end);
+    fill(el);
+  });
+
+  $("exp").addEventListener("click", function(){
+    if (demo){ toast("Demo: nothing exported"); return; }
+    var cmd = "D=" + D + "; [ -f $D/codm_tex.log ] || { echo NOLOG; exit 1; }; " +
+      "if [ -d /sdcard ]; then O=\"/sdcard/CODM Log\"; else O=\"/storage/emulated/0/CODM Log\"; fi; " +
+      "mkdir -p \"$O\" && cp -f $D/codm_tex.log \"$O/codm_tex.log\" && chmod 666 \"$O/codm_tex.log\" 2>/dev/null; " +
+      "[ -f \"$O/codm_tex.log\" ] && echo OK $(wc -c < \"$O/codm_tex.log\")";
+    sh(cmd).then(function(r){
+      if (r.stdout.indexOf("NOLOG") >= 0) toast("No log yet. Play a match first.");
+      else if (r.stdout.indexOf("OK") >= 0){ var n = parseInt(r.stdout.split("OK")[1], 10) || 0; toast("Exported " + Math.max(1, Math.round(n / 1024)) + " KB to CODM Log/codm_tex.log"); }
+      else toast("Could not export the log.");
+    });
+  });
 
   PICN.forEach(function(n, i){ loadPic(i, "jpg"); });
   refresh();
