@@ -64,7 +64,7 @@ static void L(const char *fmt, ...) {
 }
 
 /* ---------- Stage 2: mip bias ---------- */
-static std::atomic<int> g_scale{65};       /* 0 = patay; 20-99 = % ng native */
+static std::atomic<int> g_scale{65};       /* 0 = off; 20-99 = % of native resolution */
 static std::atomic<int> g_bias{2};
 static std::atomic<int> g_applied{0};
 static void (*real_tp)(GLenum, GLenum, GLint) = nullptr;
@@ -74,13 +74,13 @@ static bool is_cmp(GLenum f) {
 }
 
 /* ---------- Stage 8: blocky texture (near.txt) ---------- */
-/* near.txt: 0 = patay | 1 = bukas (default). Epekto lang kapag bias.txt >= 1.
-   Ang mga texture na tinamaan ng bias ay pinipilit sa NEAREST filter = mosaic na block. */
+/* near.txt: 0 = off | 1 = on (default). Only matters when block/bias path is active.
+   Flagged textures are forced to NEAREST filtering = mosaic blocks. */
 static std::atomic<int> g_near{1};
-static std::atomic<int> g_blk{16};      /* blk.txt: target na laki (px) ng bawat texture; 0 = gamitin ang bias.txt */
+static std::atomic<int> g_blk{16};      /* blk.txt: target size (px) per texture; 0 = use bias.txt */
 static std::atomic<int> g_flagged{0}, g_forced{0}, g_smp{0};
 static const GLuint MAXTEX = 1u << 18;
-static std::atomic<uint8_t> g_tf[1u << 18];        /* 1 = texture na pinipilit NEAREST */
+static std::atomic<uint8_t> g_tf[1u << 18];        /* 1 = texture forced to NEAREST */
 static thread_local GLuint tl_bound[32];
 static thread_local int tl_unit = 0;
 
@@ -108,7 +108,7 @@ static void h_del(GLsizei n, const GLuint *ids) {
     if (o_del) o_del(n, ids);
 }
 
-/* ---------- v16: Detail Cut (style.txt = 0 off | 1..4 = min LOD; sedge.txt = 1 -> hard MAG edges) ---------- */
+/* ---------- v16: Detail Cut (style.txt = 0 off | 1..4 = min LOD; sedge.txt = 1 -> sharp MAG edges) ---------- */
 /* ---------- v19: Flat Color (flat.txt = 0 off | 1..4 = strength). Locks texture to tiny mips = near-solid color. */
 static std::atomic<int> g_style{0};
 static std::atomic<int> g_sedge{1};
@@ -154,11 +154,11 @@ static void h_smp(GLuint s, GLenum p, GLint v) {
 
 /* ---------- Stage 9: texture groups, skip list, min size, start delay ---------- */
 static inline int64_t now_ns();
-static std::atomic<int> g_minsz{64};                 /* minsz.txt: mas maliit dito = hindi ginagalaw */
-static std::atomic<int> g_delay{0};                  /* delay.txt: segundo mula sa launch na hindi ginagalaw */
+static std::atomic<int> g_minsz{64};                 /* minsz.txt: smaller than this = leave untouched */
+static std::atomic<int> g_delay{0};                  /* delay.txt: seconds after launch with no texture changes */
 static std::atomic<int64_t> g_tstart{0};
 struct Sk { int fmt, a, b; };
-static std::vector<Sk> g_skip;                       /* skip.txt: "fmt size" (size 0 = lahat) o "fmt w h"; binabasa sa simula lang */
+static std::vector<Sk> g_skip;                       /* skip.txt: "fmt size" (size 0 = all) or "fmt w h"; read at startup only */
 struct Grp { int fmt; int sz; int n; int ap; };
 static const int MAXG = 96;
 static Grp g_grp[MAXG];
@@ -173,9 +173,15 @@ static void grp_note(int fmt, int sz, bool applied) {
     if (g_ng < MAXG) { g_grp[g_ng].fmt = fmt; g_grp[g_ng].sz = sz; g_grp[g_ng].n = 1; g_grp[g_ng].ap = applied ? 1 : 0; g_ng++; g_gdirty = 1; }
 }
 
-/* v18: PERMANENTENG skip (naka-compile; hindi nabubura ng Reset/skip.txt). Format w h.
-   37497 256x512 = Lava Remix scope/reticle atlas (ETC2 sRGB8_ALPHA8). Dagdagan dito ang ibang scope kapag natukoy na. */
-static const Sk g_builtin[] = { {37497, 256, 512} };
+/* Permanent skips (compiled in; Reset/skip.txt cannot remove these).
+   37497 256x512 = Lava Remix scope/reticle atlas.
+   37493/37492/37497 128x128 = partial character-detail protection. */
+static const Sk g_builtin[] = {
+    {37497, 256, 512},
+    {37493, 128, 128},
+    {37492, 128, 128},
+    {37497, 128, 128},
+};
 
 static bool in_skip(int fmt, int w, int h) {
     int sz = std::max(w, h);
@@ -189,7 +195,7 @@ static bool in_skip(int fmt, int w, int h) {
     return false;
 }
 
-/* v17: TEXN = bawat texture na ginawa (oras ng phone), para matukoy ang scope/reddot sa pamamagitan ng paghahambing ng dalawang log */
+/* v17: TEXN = every created texture (phone time) — compare two logs to identify scopes/reddots */
 static std::atomic<int> g_texn{0};
 static void texn_log(int w, int h, int lv, int fmt, bool cand) {
     int n = ++g_texn;
@@ -214,7 +220,7 @@ static void h_st(GLenum t, GLsizei lv, GLenum fmt, GLsizei w, GLsizei h) {
     /* v19 Flat Color: lock to tiny mips so the surface is near-solid color (lighting still applies). */
     int fl = g_flat.load();
     if (fl > 0) {
-        /* strength 1..4 → target remaining size ~8,4,2,1 px */
+        /* strength 1..4 → target remaining size ~8, 4, 2, 1 px */
         static const int FTGT[] = {0, 8, 4, 2, 1};
         int tgt = FTGT[fl < 4 ? fl : 4];
         int base = 0;
@@ -291,18 +297,18 @@ static void grp_dump(double t_s) {
 }
 
 /* ---------- Stage 3: frame-time logger + FPS cap ---------- */
-static std::atomic<int> g_fps{0};          /* 0 = walang cap, logger lang */
-static std::atomic<pid_t> g_rt{0};         /* render thread (unang tumawag ng swap) */
+static std::atomic<int> g_fps{0};          /* 0 = no cap, logger only */
+static std::atomic<pid_t> g_rt{0};         /* render thread (first caller of swap) */
 
 static inline int64_t now_ns() {
     timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
-/* ---------- Stage 5: freeze logger (logging lang, walang binabago sa laro) ---------- */
-/* fz.txt: 0 = patay (walang dagdag na hook) | 1 = buksan (default) */
+/* ---------- Stage 5: freeze logger (logging only, does not change gameplay) ---------- */
+/* fz.txt: 0 = off (no extra hooks) | 1 = on (default) */
 static std::atomic<int> g_fz{1};
-static std::atomic<int64_t> g_t0{0};       /* simula ng module, para sa timestamp */
+static std::atomic<int64_t> g_t0{0};       /* module start time for timestamps */
 
 enum { K_COMP, K_LINK, K_PBIN, K_BUF, K_TEX, K_N };
 static std::atomic<int> c_cnt[2][K_N];     /* [0] = render thread, [1] = ibang thread */
@@ -360,16 +366,16 @@ static void h_ts3(GLenum t, GLsizei lv, GLenum f, GLsizei w, GLsizei h, GLsizei 
 }
 
 /* ---------- Stage 6: per-thread CPU (alin ang busy habang may freeze) ---------- */
-/* th.txt: 0 = patay | 1 = buksan (default). Walang bagong thread; ang render thread lang ang nagbabasa ng /proc. */
+/* th.txt: 0 = off | 1 = on (default). No new thread; only the render thread reads /proc. */
 static std::atomic<int> g_th{1};
 static int g_sched_mode = -1;              /* 1 = schedstat (ns) | 0 = stat (ticks) */
 struct Thr { pid_t tid; int fd; int64_t prev, cur, wprev, wcur; char name[20]; };
-static std::vector<Thr> g_thr;             /* render thread lang ang humahawak */
+static std::vector<Thr> g_thr;             /* only the render thread handles this */
 static int g_nthr = 0;
 static const size_t MAXT = 48;
 
 /* ---------- Stage 7: core logger (logging lang) ---------- */
-/* core.txt: 0 = patay | 1 = bukas (default). Gumagana lang kapag fz.txt = 1 at th.txt = 1. */
+/* core.txt: 0 = off | 1 = on (default). Only works when fz.txt = 1 at th.txt = 1. */
 static std::atomic<int> g_core{1};
 static const int NC = 8;
 static std::vector<std::pair<pid_t, int>> g_um;    /* UnityMain: tid, fd ng stat */
@@ -604,15 +610,15 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     pid_t tid = (pid_t)syscall(SYS_gettid);
     pid_t exp = 0;
     g_rt.compare_exchange_strong(exp, tid);
-    if (g_rt.load() != tid) return r;       /* ibang thread: huwag pakialaman */
+    if (g_rt.load() != tid) return r;       /* other thread: leave alone */
 
-    static int64_t last = 0;                /* oras ng nakaraang frame (pagkatapos ng cap) */
-    static int64_t deadline = 0;            /* kailan dapat matapos ang kasalukuyang frame */
+    static int64_t last = 0;                /* time of previous frame (after cap) */
+    static int64_t deadline = 0;            /* when the current frame should finish */
     static int64_t win_start = 0;
-    static std::vector<float> ft;           /* frame times (ms) sa 5-segundong window */
+    static std::vector<float> ft;           /* frame times (ms) in a 5-second window */
     static int64_t frame_no = 0;
-    static int win_fz = 0;                  /* bilang ng freeze sa window */
-    static int fz_logged = 0;               /* limit ng FREEZE lines kada bukas */
+    static int win_fz = 0;                  /* freeze count in the stats window */
+    static int fz_logged = 0;               /* FREEZE line limit per session */
     static rusage ru_last;
     static bool ru_ok = false;
     static int64_t next_scan = 0;
@@ -622,13 +628,13 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     frame_no++;
     if (frame_no == 30) log_gl_info();
 
-    /* FPS cap: tulugan ang natitirang oras para pantay ang pagitan ng frames */
+    /* FPS cap: sleep the remaining time so frame intervals stay even */
     int cap = g_fps.load();
     if (cap > 0) {
         int64_t iv = 1000000000LL / cap;
         if (deadline == 0) deadline = t;
         deadline += iv;
-        if (t > deadline + iv) deadline = t;          /* nahuli ng malaki: mag-reset */
+        if (t > deadline + iv) deadline = t;          /* fell far behind: reset deadline */
         else if (t < deadline) {
             timespec ts;
             ts.tv_sec = deadline / 1000000000LL;
@@ -641,12 +647,12 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     float ms = 0.f;
     if (last != 0) {
         ms = (float)((t - last) / 1e6);
-        if (ms < 1000.f) ft.push_back(ms);           /* huwag isama ang loading pauses sa stats */
+        if (ms < 1000.f) ft.push_back(ms);           /* skip loading pauses in stats */
     }
     last = t;
     if (win_start == 0) win_start = t;
 
-    /* Freeze logger: basahin at i-reset ang mga counter bawat frame */
+    /* Freeze logger: read and reset counters each frame */
     if (g_fz.load()) {
         rusage ru; bool ok = (getrusage(RUSAGE_THREAD, &ru) == 0);
         bool th_on = g_th.load() != 0;
@@ -710,8 +716,8 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     return r;
 }
 
-/* ---------- Stage 4: render scale (liitan ang buffer ng window) ---------- */
-static std::atomic<int> g_fullw{1600}, g_fullh{720};   /* seed: native ng phone mo; lalaki lang, hindi liliit */
+/* ---------- Stage 4: render scale (shrink the window buffer) ---------- */
+static std::atomic<int> g_fullw{1600}, g_fullh{720};   /* seed: device native; only grows, never shrinks */
 static std::atomic<int> g_sbgn{0};
 
 static EGLSurface (*o_cws)(EGLDisplay, EGLConfig, EGLNativeWindowType, const EGLint *) = nullptr;
@@ -919,7 +925,7 @@ static void load_cfg() {
     }
 }
 
-/* mode.txt: 0 = walang ginagawa | 1 = thread lang | 2 = thread + hanap libunity (walang hook) | 3 = buong hook (polling) | 4 = hook sa mismong pag-load ng libunity (walang thread) */
+/* mode.txt: 0 = idle | 1 = thread only | 2 = thread + find libunity (no hooks) | 3 = full hooks (polling) | 4 = hook at libunity load (no poll thread) */
 static int read_mode() {
     int v = 0;
     FILE *f = fopen(MODEF, "r");
@@ -933,7 +939,7 @@ static int read_mode() {
     return std::max(0, std::min(v, 4));
 }
 
-/* Irehistro ang lahat ng hook sa isang libunity mapping */
+/* Register all hooks on one libunity mapping */
 static void reg_hooks(dev_t dv, ino_t in) {
     lsplt::RegisterHook(dv, in, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
     lsplt::RegisterHook(dv, in, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
@@ -962,7 +968,7 @@ static void reg_hooks(dev_t dv, ino_t in) {
     }
 }
 
-/* ---------- Mode 4: i-hook ang libunity ilang sandali LANG matapos itong ma-load ---------- */
+/* ---------- Mode 4: hook libunity only briefly right after it loads ---------- */
 static std::atomic<bool> g_hooked{false};
 static void *(*o_adle)(const char *, int, const android_dlextinfo *) = nullptr;
 
@@ -977,7 +983,7 @@ static void install_unity_hooks() {
         L("commit=%d (unity)\n", (int)ok);
         return;
     }
-    L("libunity hindi nakita sa maps\n");
+    L("libunity not found in maps\n");
     g_hooked = false;
 }
 
@@ -986,7 +992,7 @@ static void *h_adle(const char *path, int flags, const android_dlextinfo *info) 
     if (r && path) {
         size_t n = strlen(path);
         if (n >= 11 && !strcmp(path + n - 11, "libunity.so")) {
-            L("dlopen libunity tapos na: %s\n", path);
+            L("dlopen libunity done: %s\n", path);
             install_unity_hooks();
         }
     }
@@ -1002,14 +1008,14 @@ static void hook_nativeloader() {
         L("nativeloader hook commit=%d\n", (int)ok);
         return;
     }
-    L("libnativeloader hindi nakita\n");
+    L("libnativeloader not found\n");
 }
 
 static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
-    std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
-    L("=== start v19 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d flat=%d builtin=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load(), g_flat.load(), (int)(sizeof g_builtin / sizeof g_builtin[0]));
+    std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* when libunity was first seen */
+    L("=== start v20 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d flat=%d builtin=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load(), g_flat.load(), (int)(sizeof g_builtin / sizeof g_builtin[0]));
     int total = (mode == 1) ? 60 : 1200;
     for (int i = 0; i < total; i++) {
         if (mode >= 2) {
@@ -1021,9 +1027,9 @@ static void run(int mode) {
                 if (done.count(key)) continue;
                 auto it = first.find(key);
                 if (it == first.end()) { first[key] = now_ns(); L("SEEN libunity i=%d\n", i); continue; }
-                if (now_ns() - it->second < 3000000000LL) continue;   /* hintayin matapos ang load */
+                if (now_ns() - it->second < 3000000000LL) continue;   /* wait until loading finishes */
                 done.insert(key);
-                if (mode == 2) { L("mode2: stable, walang hook\n"); continue; }
+                if (mode == 2) { L("mode2: stable, no hooks\n"); continue; }
                 reg_hooks(m.dev, m.inode);
                 added = true;
             }
@@ -1052,7 +1058,7 @@ public:
         int mode = read_mode();
         if (mode == 4) {
             load_cfg();
-            L("=== start v19 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d flat=%d builtin=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load(), g_flat.load(), (int)(sizeof g_builtin / sizeof g_builtin[0]));
+            L("=== start v20 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d flat=%d builtin=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load(), g_flat.load(), (int)(sizeof g_builtin / sizeof g_builtin[0]));
             hook_nativeloader();
             return;
         }
