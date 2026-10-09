@@ -97,6 +97,7 @@ input[type=range]:disabled{opacity:.4}
 .banner.warn{border-color:var(--warn);color:var(--warn)}
 .banner.bad{border-color:var(--bad);color:var(--bad)}
 .banner .btn{margin-top:10px;min-height:44px}
+textarea{display:block;width:100%;min-height:110px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:#06080f;color:#cfd7f5;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;resize:vertical}
 .stat{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);color:var(--mute);font-size:13px}
 .foot{margin:22px 4px 0;color:var(--mute);font-size:13px;text-align:center}
 
@@ -194,6 +195,17 @@ input[type=range]:disabled{opacity:.4}
       <button class="btn" id="gall" type="button">Turn all on</button>
     </div>
     <p class="pnote">A group is one texture format and size. Walls and floors can share a group, so switching it off affects both.</p>
+  </section>
+
+  <section class="card">
+    <h2>Skip list (advanced)</h2>
+    <p class="cap">One group per line. Use <b>format size</b> or <b>format width height</b>. Textures in these groups stay original.</p>
+    <textarea id="skipt" rows="5" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Skip list"></textarea>
+    <div class="grid2">
+      <button class="btn" id="skips" type="button">Save list</button>
+      <button class="btn" id="skipr" type="button">Reload</button>
+    </div>
+    <p class="pnote">Format is the number from the log (for example 37496 is ETC2 RGBA). Tap Apply for CODM after saving.</p>
   </section>
 
   <section class="card">
@@ -534,7 +546,8 @@ input[type=range]:disabled{opacity:.4}
     var map = {}, i, m, re = /fmt=(\d+)\s+hex=\S+\s+sz=(\d+)\s+n=(\d+)\s+ap=(\d+)/;
     skipSet = {}; extraSkip = [];
     skipText.split("\n").forEach(function(l){
-      m = /^\s*(\d+)\s+(\d+)\s*$/.exec(l); if (!m) return;
+      m = /^\s*(\d+)\s+(\d+)\s*$/.exec(l);
+      if (!m){ if (/^\s*\d+\s+\d+\s+\d+\s*$/.test(l)) extraSkip.push(l.trim().replace(/\s+/g, " ")); return; }
       if (m[2] === "0") extraSkip.push(l.trim()); else skipSet[m[1] + "|" + m[2]] = 1;
     });
     texgText.split("\n").forEach(function(l){
@@ -554,7 +567,13 @@ input[type=range]:disabled{opacity:.4}
     cmd += "chmod 666 $D/skip.txt 2>/dev/null; echo OK";
     return sh(cmd).then(function(r){ r.ok = r.stdout.indexOf("OK") >= 0; return r; });
   }
+  function syncSkipText(){
+    var lines = extraSkip.slice();
+    Object.keys(skipSet).forEach(function(k){ lines.push(k.replace("|", " ")); });
+    $("skipt").value = lines.join("\n");
+  }
   function renderGroups(){
+    syncSkipText();
     var box = $("groups"); box.innerHTML = "";
     if (!groups.length){
       var p = document.createElement("p"); p.className = "desc"; p.textContent = "No groups yet. Play a match with the logs on, then tap Refresh list."; box.appendChild(p); return;
@@ -569,6 +588,7 @@ input[type=range]:disabled{opacity:.4}
       b.addEventListener("click", function(){
         if (skipSet[key]) delete skipSet[key]; else skipSet[key] = 1;
         b.setAttribute("aria-checked", skipSet[key] ? "false" : "true");
+        syncSkipText();
         writeSkip().then(function(r){ toast(r.ok ? "Saved. Tap Apply for CODM." : "Could not save the list."); });
       });
       box.appendChild(b);
@@ -591,6 +611,17 @@ input[type=range]:disabled{opacity:.4}
   $("minsz").addEventListener("change", function(){ save({minsz:MINS[parseInt($("minsz").value, 10)]}, "Smallest texture"); });
   $("delay").addEventListener("input", function(){ var d = parseInt($("delay").value, 10); $("delayV").textContent = d ? (d * 5) + " s" : "Off"; fill($("delay")); });
   $("delay").addEventListener("change", function(){ save({delay:parseInt($("delay").value, 10) * 5}, "Start delay"); });
+  $("skips").addEventListener("click", function(){
+    var ok = [], bad = 0;
+    $("skipt").value.split("\n").forEach(function(l){
+      l = l.trim(); if (!l) return;
+      if (/^\d+(\s+\d+){1,2}$/.test(l)) ok.push(l.replace(/\s+/g, " ")); else bad++;
+    });
+    skipSet = {}; extraSkip = [];
+    ok.forEach(function(l){ var p = l.split(" "); if (p.length === 2 && p[1] !== "0") skipSet[p[0] + "|" + p[1]] = 1; else extraSkip.push(l); });
+    writeSkip().then(function(r){ renderGroups(); toast(r.ok ? ("Saved " + ok.length + " line" + (ok.length === 1 ? "" : "s") + (bad ? ", ignored " + bad : "") + ". Tap Apply for CODM.") : "Could not save the list."); });
+  });
+  $("skipr").addEventListener("click", function(){ refresh().then(function(){ toast("Reloaded"); }); });
   $("gref").addEventListener("click", function(){ refresh().then(function(){ toast("List refreshed"); }); });
   $("gall").addEventListener("click", function(){ skipSet = {}; extraSkip = []; writeSkip().then(function(r){ renderGroups(); toast(r.ok ? "All groups on. Tap Apply for CODM." : "Could not save the list."); }); });
   $("fps").addEventListener("input", function(){ var f = FPS[parseInt($("fps").value, 10)]; $("fpsV").textContent = f ? f : "Off"; fill($("fps")); updateStatus(); });
