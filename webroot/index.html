@@ -142,6 +142,20 @@ input[type=range]:disabled{opacity:.4}
   </section>
 
   <section class="card">
+    <h2>Redmi style</h2>
+    <p class="cap">Blocky look that keeps the original colors, like the Game Turbo setting on Redmi phones. When this is not Off, the Block size above is ignored.</p>
+    <div class="row">
+      <div class="rh"><label for="sty">Strength</label><span class="val" id="styV">Off</span></div>
+      <p class="desc" id="styD">Off. The Block size above is used.</p>
+      <input type="range" id="sty" min="0" max="4" step="1" value="0">
+    </div>
+    <button class="sw" id="sedge" role="switch" aria-checked="true" type="button" style="margin-top:10px">
+      <span><span class="t">Sharp pixel edges</span><span class="d">Close-up textures show hard squares. Turn off for a softer blur.</span></span><span class="knob"></span>
+    </button>
+    <p class="pnote">Also sets anisotropic filtering to 1x, as in the Redmi preset. Smallest texture, Start delay and Texture groups below still apply. Use +2 to match Redmi.</p>
+  </section>
+
+  <section class="card">
     <h2>Display</h2>
     <p class="cap">Lower values are lighter on the phone but less sharp.</p>
     <div class="row">
@@ -231,10 +245,11 @@ input[type=range]:disabled{opacity:.4}
   var BLKCOLS = [160, 80, 48, 28, 16, 9];
   var FPS = [0, 30, 40, 45, 60, 72, 90, 120];
   var MINS = [64, 128, 256, 512, 1024, 2048];
-  var REC = {blk:16, bias:0, near:1, scale:0, fps:0, fz:1, th:1, core:1, minsz:64, delay:0};
+  var REC = {blk:16, bias:0, near:1, scale:0, fps:0, fz:1, th:1, core:1, minsz:64, delay:0, style:0, sedge:1};
+  var STYN = ["Off", "Light", "Redmi", "Strong", "Extreme"];
 
   var demo = (typeof ksu === "undefined");
-  var fake = {blk:"16", bias:"0", near:"1", scale:"0", fps:"0", fz:"1", th:"1", core:"1", mode:"4", minsz:"64", delay:"0", skip:"", texg:"TEXG t=60 fmt=37812 hex=0x93b4 sz=1024 n=40 ap=40\nTEXG t=60 fmt=37812 hex=0x93b4 sz=2048 n=6 ap=6\nTEXG t=60 fmt=37815 hex=0x93b7 sz=512 n=120 ap=120", ft:"FT fps=55.2 avg=18.1ms n=276 fz=1"};
+  var fake = {blk:"16", bias:"0", near:"1", scale:"0", fps:"0", fz:"1", th:"1", core:"1", mode:"4", minsz:"64", delay:"0", style:"0", sedge:"1", skip:"", texg:"TEXG t=60 fmt=37812 hex=0x93b4 sz=1024 n=40 ap=40\nTEXG t=60 fmt=37812 hex=0x93b4 sz=2048 n=6 ap=6\nTEXG t=60 fmt=37815 hex=0x93b7 sz=512 n=120 ap=120", ft:"FT fps=55.2 avg=18.1ms n=276 fz=1"};
   var seq = 0, cfg = {};
 
   function $(id){ return document.getElementById(id); }
@@ -289,7 +304,7 @@ input[type=range]:disabled{opacity:.4}
   function readState(){
     if (demo) return Promise.resolve(Object.assign({}, fake));
     var cmd = "D=" + D + "; [ -d $D ] || { echo NODIR; exit 0; }; " +
-      "for f in blk bias near scale fps fz th core mode minsz delay; do echo $f=$(cat $D/$f.txt 2>/dev/null); done; " +
+      "for f in blk bias near scale fps fz th core mode minsz delay style sedge; do echo $f=$(cat $D/$f.txt 2>/dev/null); done; " +
       "echo ft=$(grep '^FT' $D/codm_tex.log 2>/dev/null | tail -n 1); " +
       "echo ---SKIP; cat $D/skip.txt 2>/dev/null; echo ---TEXG; grep '^TEXG' $D/codm_tex.log 2>/dev/null | tail -n 300";
     return sh(cmd).then(function(r){
@@ -453,9 +468,16 @@ input[type=range]:disabled{opacity:.4}
     $("tagR").textContent = i === 0 ? "Off" : "Blocks";
     drawPreview(); fill($("blk"));
   }
+  function updateStyUI(){
+    var v = parseInt($("sty").value, 10);
+    $("styV").textContent = v ? (STYN[v] + " +" + v) : "Off";
+    $("styD").textContent = v ? ("Textures are sampled " + v + " mip levels smaller. Block size is ignored.") : "Off. The Block size above is used.";
+    fill($("sty"));
+  }
   function updateStatus(){
     var i = parseInt($("blk").value, 10), s = parseInt($("scale").value, 10), f = FPS[parseInt($("fps").value, 10)];
-    $("status").textContent = "Block size " + blkLabel(i) + ", scale " + s + "%, " + (f ? f + " fps cap" : "no fps cap");
+    var sy = parseInt($("sty").value, 10);
+    $("status").textContent = (sy ? "Redmi style +" + sy : "Block size " + blkLabel(i)) + ", scale " + s + "%, " + (f ? f + " fps cap" : "no fps cap");
   }
 
   function render(s){
@@ -483,6 +505,7 @@ input[type=range]:disabled{opacity:.4}
     $("fps").value = fpsIdx(f);
     if (!demo && (parseInt(s.bias, 10) || 0) > 0) writeFiles({bias:0});   /* walang mip bias na sumasabay sa block size */
     if (!demo && s.near !== "1") writeFiles({near:1});   /* laging naka-on ang hard pixel edges */
+    var sy = parseInt(s.style, 10) || 0; $("sty").value = Math.max(0, Math.min(4, sy)); setSw("sedge", s.sedge !== "0"); updateStyUI();
     setSw("fz", s.fz !== "0"); setSw("th", s.th !== "0"); setSw("core", s.core !== "0");
     $("scaleV").textContent = $("scale").value + "%"; fill($("scale"));
     $("fpsV").textContent = f ? FPS[$("fps").value] : "Off"; fill($("fps"));
@@ -559,6 +582,9 @@ input[type=range]:disabled{opacity:.4}
     var i = parseInt($("blk").value, 10), m = {blk:BLK[i], bias:0, near:1};
     save(m, "Block size");
   });
+  $("sty").addEventListener("input", function(){ updateStyUI(); updateStatus(); });
+  $("sty").addEventListener("change", function(){ save({style:parseInt($("sty").value, 10)}, "Redmi style"); });
+  $("sedge").addEventListener("click", function(){ var on = !getSw("sedge"); setSw("sedge", on); save({sedge:on ? 1 : 0}, "Sharp edges"); });
   $("scale").addEventListener("input", function(){ $("scaleV").textContent = $("scale").value + "%"; fill($("scale")); updateStatus(); });
   $("scale").addEventListener("change", function(){ var v = parseInt($("scale").value, 10); save({scale:v >= 100 ? 0 : v}, "Render scale"); });
   $("minsz").addEventListener("input", function(){ $("minszV").textContent = MINS[parseInt($("minsz").value, 10)] + " px"; fill($("minsz")); });
