@@ -151,7 +151,7 @@ h2 {
   color: var(--mute);
   font: inherit;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
@@ -494,11 +494,12 @@ textarea {
   <div class="view active" id="v-home">
     <section class="card">
       <h2>Look</h2>
-      <p class="cap">Choose one style. Turning one on automatically turns the other off.</p>
+      <p class="cap">Choose one look. Turning one on turns the others off. Flat is experimental.</p>
       <div class="seg" id="lookSeg" role="group" aria-label="Look mode">
         <button type="button" data-m="0" class="on">Off</button>
-        <button type="button" data-m="1">Pixel Blocks</button>
-        <button type="button" data-m="2">Detail Cut</button>
+        <button type="button" data-m="1">Blocks</button>
+        <button type="button" data-m="2">Detail</button>
+        <button type="button" data-m="3">Flat</button>
       </div>
 
       <div class="row" id="strRow">
@@ -665,6 +666,7 @@ textarea {
 
   /* Detail Cut levels */
   var DCN = ["Off", "Light", "Medium", "Strong", "Extreme"];
+  var FLATN = ["Off", "Light", "Medium", "Strong", "Extreme"];
 
   var FPS = [0, 30, 40, 45, 60, 72, 90, 120];
   var MINS = [64, 128, 256, 512, 1024, 2048];
@@ -673,14 +675,14 @@ textarea {
   var REC = {
     blk: 0, bias: 0, near: 1, scale: 0, fps: 0,
     fz: 1, th: 1, core: 1, mode: 4,
-    minsz: 64, delay: 0, style: 0, sedge: 1
+    minsz: 64, delay: 0, style: 0, sedge: 1, flat: 0
   };
 
   var demo = (typeof ksu === "undefined");
   var fake = {
     blk: "0", bias: "0", near: "1", scale: "0", fps: "0",
     fz: "1", th: "1", core: "1", mode: "4",
-    minsz: "64", delay: "0", style: "0", sedge: "1",
+    minsz: "64", delay: "0", style: "0", sedge: "1", flat: "0",
     skip: "",
     texg: "TEXG t=60 fmt=37812 hex=0x93b4 sz=1024 n=40 ap=40\nTEXG t=60 fmt=37812 hex=0x93b4 sz=2048 n=6 ap=6\nTEXG t=60 fmt=37815 hex=0x93b7 sz=512 n=120 ap=120",
     ft: "FT fps=55.2 avg=18.1ms n=276 fz=1"
@@ -766,7 +768,7 @@ textarea {
     var cmd =
       "D=" + D + "; " +
       "[ -d $D ] || { echo NODIR; exit 0; }; " +
-      "for f in bias scale fps fz th core near blk minsz delay style sedge mode; do " +
+      "for f in bias scale fps fz th core near blk minsz delay style sedge flat mode; do " +
       "  if [ -f $D/$f.txt ]; then printf '%s=' $f; cat $D/$f.txt; else printf '%s=\\n' $f; fi; " +
       "done; " +
       "echo -n 'skip='; [ -f $D/skip.txt ] && cat $D/skip.txt | tr '\\n' '|' || true; echo; " +
@@ -886,13 +888,20 @@ textarea {
       var bi = +str.value;
       $("strV").textContent = BLK[bi] + " px";
       $("strD").textContent = BLKN[bi] + " — every texture is reduced to about " + BLK[bi] + " pixels across.";
-    } else {
+    } else if (lookMode === 2) {
       str.disabled = false;
       str.min = 1; str.max = 4; str.step = 1;
       str.value = Math.max(1, Math.min(4, strVal));
       var di = +str.value;
       $("strV").textContent = DCN[di];
       $("strD").textContent = "Textures are sampled " + di + " mip level" + (di === 1 ? "" : "s") + " smaller. Colors stay the same.";
+    } else {
+      str.disabled = false;
+      str.min = 1; str.max = 4; str.step = 1;
+      str.value = Math.max(1, Math.min(4, strVal));
+      var fi = +str.value;
+      $("strV").textContent = FLATN[fi];
+      $("strD").textContent = "Experimental. Surfaces become near-solid color. Lighting stays. Start low (+1).";
     }
     fill(str);
     updateStatus();
@@ -902,22 +911,20 @@ textarea {
     var sc = parseInt($("scale").value, 10);
     var f = FPS[parseInt($("fps").value, 10)];
     var look = "Off";
-    if (lookMode === 1) look = "Pixel Blocks " + BLK[Math.max(1, Math.min(5, strVal))] + " px";
-    else if (lookMode === 2) look = "Detail Cut +" + Math.max(1, Math.min(4, strVal));
+    if (lookMode === 1) look = "Blocks " + BLK[Math.max(1, Math.min(5, strVal))] + " px";
+    else if (lookMode === 2) look = "Detail +" + Math.max(1, Math.min(4, strVal));
+    else if (lookMode === 3) look = "Flat +" + Math.max(1, Math.min(4, strVal));
     $("status").textContent = look + " · scale " + sc + "% · " + (f ? f + " fps cap" : "no fps cap");
   }
 
   function applyLookToFiles() {
-    var map = { near: 1, bias: 0, sedge: 1 };
-    if (lookMode === 0) {
-      map.blk = 0;
-      map.style = 0;
-    } else if (lookMode === 1) {
+    var map = { near: 1, bias: 0, sedge: 1, blk: 0, style: 0, flat: 0 };
+    if (lookMode === 1) {
       map.blk = BLK[Math.max(1, Math.min(5, strVal))];
-      map.style = 0;
-    } else {
-      map.blk = 0;
+    } else if (lookMode === 2) {
       map.style = Math.max(1, Math.min(4, strVal));
+    } else if (lookMode === 3) {
+      map.flat = Math.max(1, Math.min(4, strVal));
     }
     return save(map, "Look");
   }
@@ -960,7 +967,11 @@ textarea {
     /* determine look mode from files */
     var sty = parseInt(s.style, 10) || 0;
     var blk = parseInt(s.blk, 10) || 0;
-    if (sty > 0) {
+    var flt = parseInt(s.flat, 10) || 0;
+    if (flt > 0) {
+      lookMode = 3;
+      strVal = Math.max(1, Math.min(4, flt));
+    } else if (sty > 0) {
       lookMode = 2;
       strVal = Math.max(1, Math.min(4, sty));
     } else if (blk > 0) {
@@ -1123,9 +1134,8 @@ textarea {
   Array.prototype.forEach.call($("lookSeg").children, function (b) {
     b.addEventListener("click", function () {
       lookMode = +b.getAttribute("data-m");
-      if (lookMode === 1 && strVal < 1) strVal = 3;
-      if (lookMode === 2 && strVal > 4) strVal = 2;
-      if (lookMode === 2 && strVal < 1) strVal = 2;
+      if (lookMode === 1) { if (strVal < 1 || strVal > 5) strVal = 3; }
+      else if (lookMode === 2 || lookMode === 3) { if (strVal < 1 || strVal > 4) strVal = 2; }
       updateLookUI();
       applyLookToFiles();
     });
