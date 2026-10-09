@@ -43,6 +43,9 @@
 #define COREF DIR "core.txt"
 #define NEARF DIR "near.txt"
 #define BLKF DIR "blk.txt"
+#define MINF DIR "minsz.txt"
+#define DLYF DIR "delay.txt"
+#define SKIPF DIR "skip.txt"
 
 static std::mutex mu;
 static FILE *lf = nullptr;
@@ -119,20 +122,52 @@ static void h_smp(GLuint s, GLenum p, GLint v) {
     if (o_smp) o_smp(s, p, v);
 }
 
+/* ---------- Stage 9: texture groups, skip list, min size, start delay ---------- */
+static inline int64_t now_ns();
+static std::atomic<int> g_minsz{64};                 /* minsz.txt: mas maliit dito = hindi ginagalaw */
+static std::atomic<int> g_delay{0};                  /* delay.txt: segundo mula sa launch na hindi ginagalaw */
+static std::atomic<int64_t> g_tstart{0};
+static std::vector<std::pair<int, int>> g_skip;      /* skip.txt: "fmt size" (size 0 = lahat ng laki); binabasa sa simula lang */
+struct Grp { int fmt; int sz; int n; int ap; };
+static const int MAXG = 96;
+static Grp g_grp[MAXG];
+static int g_ng = 0;
+static std::mutex g_gm;
+static std::atomic<int> g_gdirty{0};
+
+static void grp_note(int fmt, int sz, bool applied) {
+    std::lock_guard<std::mutex> lk(g_gm);
+    for (int i = 0; i < g_ng; i++)
+        if (g_grp[i].fmt == fmt && g_grp[i].sz == sz) { g_grp[i].n++; if (applied) g_grp[i].ap++; g_gdirty = 1; return; }
+    if (g_ng < MAXG) { g_grp[g_ng].fmt = fmt; g_grp[g_ng].sz = sz; g_grp[g_ng].n = 1; g_grp[g_ng].ap = applied ? 1 : 0; g_ng++; g_gdirty = 1; }
+}
+
+static bool in_skip(int fmt, int sz) {
+    for (auto &p : g_skip) if (p.first == fmt && (p.second == 0 || p.second == sz)) return true;
+    return false;
+}
+
 static void (*o_st)(GLenum, GLsizei, GLenum, GLsizei, GLsizei) = nullptr;
 static void h_st(GLenum t, GLsizei lv, GLenum fmt, GLsizei w, GLsizei h) {
     if (o_st) o_st(t, lv, fmt, w, h);
     int b = g_bias.load(), k = g_blk.load();
     int mx = std::max(w, h);
+    bool cand = (t == GL_TEXTURE_2D && lv >= 3 && mx >= 64 && is_cmp(fmt));
+    if (!cand) return;
+    bool skip = in_skip((int)fmt, mx) || mx < g_minsz.load();
+    int dl = g_delay.load();
+    if (!skip && dl > 0 && now_ns() - g_tstart.load() < (int64_t)dl * 1000000000LL) skip = true;
     int base = 0;
-    if (k > 0) {
-        /* lahat ng texture (kahit anong laki) ay ibababa sa ~k px */
-        if (lv >= 3 && mx >= 64 && mx > k)
-            while ((mx >> (base + 1)) >= k && base < (int)lv - 2) base++;
-    } else if (b > 0 && lv >= 4 && mx >= 512) {
-        base = std::min(b, (int)lv - 2);
+    if (!skip) {
+        if (k > 0) {
+            if (mx > k)
+                while ((mx >> (base + 1)) >= k && base < (int)lv - 2) base++;
+        } else if (b > 0 && lv >= 4 && mx >= 512) {
+            base = std::min(b, (int)lv - 2);
+        }
     }
-    if (base > 0 && real_tp && t == GL_TEXTURE_2D && is_cmp(fmt)) {
+    grp_note((int)fmt, mx, base > 0);
+    if (base > 0 && real_tp) {
         real_tp(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, base);
         if (g_near.load()) {
             GLuint id = tl_bound[tl_unit];
@@ -146,6 +181,13 @@ static void h_st(GLenum t, GLsizei lv, GLenum fmt, GLsizei w, GLsizei h) {
         if (n <= 100 || n % 500 == 0)
             L("APPLIED #%d %dx%d lv=%d fmt=0x%x base=%d blk=%d\n", n, w, h, lv, fmt, base, k);
     }
+}
+
+static void grp_dump(double t_s) {
+    Grp tmp[MAXG]; int n;
+    { std::lock_guard<std::mutex> lk(g_gm); n = g_ng; for (int i = 0; i < n; i++) tmp[i] = g_grp[i]; g_gdirty = 0; }
+    for (int i = 0; i < n; i++)
+        L("TEXG t=%.0f fmt=%d hex=0x%x sz=%d n=%d ap=%d\n", t_s, tmp[i].fmt, tmp[i].fmt, tmp[i].sz, tmp[i].n, tmp[i].ap);
 }
 
 /* ---------- Stage 3: frame-time logger + FPS cap ---------- */
@@ -347,6 +389,7 @@ static bool read_cpu(int fd, int64_t &run, int64_t &wait) {
     wait = 0;
     return true;
 }
+
 static void th_init() {
     char path[64];
     snprintf(path, sizeof path, "/proc/self/task/%d/schedstat", (int)getpid());
@@ -544,6 +587,10 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
           1000.0 * n / sum, sum / n, p50, p99, mx, s33, s50, n, cap, g_bias.load(), g_scale.load(),
           (t - g_t0.load()) / 1e9, win_fz);
         if (g_near.load()) L("NEAR flagged=%d forced=%d smp=%d\n", g_flagged.load(), g_forced.load(), g_smp.load());
+        {
+            static int64_t last_gd = 0;
+            if (g_gdirty.load() && t - last_gd >= 20000000000LL) { last_gd = t; grp_dump((t - g_t0.load()) / 1e9); }
+        }
         if (g_fz.load() && g_th.load() && g_core.load()) core_hist((t - g_t0.load()) / 1e9);
         ft.clear();
         win_fz = 0;
@@ -551,6 +598,7 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     }
     return r;
 }
+
 /* ---------- Stage 4: render scale (liitan ang buffer ng window) ---------- */
 static std::atomic<int> g_fullw{1600}, g_fullh{720};   /* seed: native ng phone mo; lalaki lang, hindi liliit */
 static std::atomic<int> g_sbgn{0};
@@ -690,6 +738,32 @@ static void load_cfg() {
         f = fopen(BLKF, "w");
         if (f) { fprintf(f, "16\n"); fclose(f); }
     }
+    f = fopen(MINF, "r");
+    if (f) {
+        int v = 64;
+        if (fscanf(f, "%d", &v) == 1) g_minsz = std::max(64, std::min(v, 2048));
+        fclose(f);
+    } else {
+        f = fopen(MINF, "w");
+        if (f) { fprintf(f, "64\n"); fclose(f); }
+    }
+    f = fopen(DLYF, "r");
+    if (f) {
+        int v = 0;
+        if (fscanf(f, "%d", &v) == 1) g_delay = std::max(0, std::min(v, 120));
+        fclose(f);
+    } else {
+        f = fopen(DLYF, "w");
+        if (f) { fprintf(f, "0\n"); fclose(f); }
+    }
+    g_skip.clear();
+    f = fopen(SKIPF, "r");
+    if (f) {
+        int a = 0, c = 0;
+        while (g_skip.size() < 64 && fscanf(f, "%d %d", &a, &c) == 2) g_skip.push_back({a, c});
+        fclose(f);
+    }
+    g_tstart = now_ns();
     f = fopen(COREF, "r");
     if (f) {
         int v = 1;
@@ -790,7 +864,7 @@ static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
     std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
-    L("=== start v14 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load());
+    L("=== start v15 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size());
     int total = (mode == 1) ? 60 : 1200;
     for (int i = 0; i < total; i++) {
         if (mode >= 2) {
@@ -833,7 +907,7 @@ public:
         int mode = read_mode();
         if (mode == 4) {
             load_cfg();
-            L("=== start v14 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load());
+            L("=== start v15 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size());
             hook_nativeloader();
             return;
         }
