@@ -151,7 +151,7 @@ h2 {
   color: var(--mute);
   font: inherit;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
@@ -284,6 +284,25 @@ input[type=range]:disabled { opacity: 0.35; }
   color: var(--mute);
   font-size: 11.5px;
 }
+.logstat {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,0.28);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.logstat b { color: var(--accent2); font-weight: 650; }
+.logstat .ok { color: #7ddea0; }
+.logstat .warn { color: #e8c27a; }
+.logstat .bad { color: #f0a0a0; }
+.logstat .startline { opacity: 0.85; font-size: 11px; margin-top: 2px; }
+.logstat .expgap { margin-top: 6px; }
+
 
 /* buttons */
 .btn {
@@ -497,8 +516,8 @@ textarea {
       <p class="cap">Choose one look. Turning one on turns the others off. Flat is experimental.</p>
       <div class="seg" id="lookSeg" role="group" aria-label="Look mode">
         <button type="button" data-m="0" class="on">Off</button>
-        <button type="button" data-m="1">Blocks</button>
-        <button type="button" data-m="2">Detail</button>
+        <button type="button" data-m="1">Pixel Blocks</button>
+        <button type="button" data-m="2">Detail Cut</button>
         <button type="button" data-m="3">Flat</button>
       </div>
 
@@ -601,13 +620,17 @@ textarea {
   <div class="view" id="v-tools">
     <section class="card">
       <h2>Log</h2>
-      <p class="cap">View, export or clear the frame log.</p>
+      <p class="cap">View, export or clear the frame log (codm_tex.log).</p>
+      <div id="logStat" class="logstat">Checking log…</div>
       <div class="stack" style="margin-top:10px">
         <div class="grid2" style="margin-top:0">
           <button class="btn" id="vlog" type="button">View log</button>
           <button class="btn" id="exp" type="button">Export log</button>
         </div>
-        <button class="btn" id="clr" type="button">Clear log</button>
+        <div class="grid2" style="margin-top:0">
+          <button class="btn" id="clr" type="button">Clear log</button>
+          <button class="btn" id="logref" type="button">Refresh status</button>
+        </div>
       </div>
       <p class="pnote">Export saves to <b>CODM Log/codm_tex.log</b> in internal storage and replaces the previous file.</p>
     </section>
@@ -825,6 +848,7 @@ textarea {
       else b.removeAttribute("aria-current");
     });
     window.scrollTo(0, 0);
+    if (name === "tools") refreshLogStat();
   }
   Array.prototype.forEach.call(document.querySelectorAll("#nav button"), function (b) {
     b.addEventListener("click", function () {
@@ -911,8 +935,8 @@ textarea {
     var sc = parseInt($("scale").value, 10);
     var f = FPS[parseInt($("fps").value, 10)];
     var look = "Off";
-    if (lookMode === 1) look = "Blocks " + BLK[Math.max(1, Math.min(5, strVal))] + " px";
-    else if (lookMode === 2) look = "Detail +" + Math.max(1, Math.min(4, strVal));
+    if (lookMode === 1) look = "Pixel Blocks " + BLK[Math.max(1, Math.min(5, strVal))] + " px";
+    else if (lookMode === 2) look = "Detail Cut +" + Math.max(1, Math.min(4, strVal));
     else if (lookMode === 3) look = "Flat +" + Math.max(1, Math.min(4, strVal));
     $("status").textContent = look + " · scale " + sc + "% · " + (f ? f + " fps cap" : "no fps cap");
   }
@@ -1242,12 +1266,88 @@ textarea {
         : (r.errno === 0 ? "CODM stopped. Open it again to apply." : "Could not stop CODM."));
     });
   });
+
+  function fmtBytes(n) {
+    n = +n || 0;
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / (1024 * 1024)).toFixed(2) + " MB";
+  }
+
+  function refreshLogStat() {
+    var el = $("logStat");
+    if (!el) return;
+    if (demo) {
+      el.innerHTML = '<span class="warn">Demo mode</span> — log status is only available inside SukiSU.';
+      return;
+    }
+    el.textContent = "Checking…";
+    var cmd =
+      "L=" + D + "/codm_tex.log; " +
+      "E='/sdcard/CODM Log/codm_tex.log'; " +
+      "echo '---LIVE---'; " +
+      "if [ -f \"$L\" ]; then " +
+      "  echo PRESENT; " +
+      "  wc -c < \"$L\"; " +
+      "  wc -l < \"$L\"; " +
+      "  date -r \"$L\" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || stat -c '%y' \"$L\" 2>/dev/null | cut -c1-19; " +
+      "  grep -E '^=== start' \"$L\" 2>/dev/null | tail -n 1; " +
+      "else echo MISSING; fi; " +
+      "echo '---EXPORT---'; " +
+      "if [ -f \"$E\" ]; then " +
+      "  echo PRESENT; " +
+      "  wc -c < \"$E\"; " +
+      "  date -r \"$E\" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || stat -c '%y' \"$E\" 2>/dev/null | cut -c1-19; " +
+      "else echo MISSING; fi";
+    sh(cmd).then(function (r) {
+      var out = (r.stdout || "").trim();
+      if (!out) {
+        el.innerHTML = '<span class="bad">Could not read log status.</span>';
+        return;
+      }
+      var parts = out.split("---EXPORT---");
+      var livePart = (parts[0] || "").replace("---LIVE---", "").trim();
+      var expPart = (parts[1] || "").trim();
+      var ll = livePart.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      var exp = expPart.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      var html = "";
+      if (ll[0] === "MISSING" || !ll.length) {
+        html += '<div><span class="warn">Live log:</span> <b>cleared / none</b></div>';
+      } else {
+        var bytes = ll[1] || "0";
+        var lines = ll[2] || "?";
+        var when = ll[3] || "?";
+        var startLine = ll.slice(4).join(" ") || "";
+        html += '<div><span class="ok">Live log:</span> <b>' + fmtBytes(bytes) + "</b> · " + lines + " lines</div>";
+        html += "<div>Updated: " + when + "</div>";
+        if (startLine) {
+          html += '<div class="startline">' + startLine.replace(/</g, "&lt;") + "</div>";
+        }
+      }
+      if (exp[0] === "MISSING" || !exp[0]) {
+        html += '<div class="expgap"><span class="warn">Exported:</span> <b>not yet</b></div>';
+      } else {
+        html += '<div class="expgap"><span class="ok">Exported:</span> <b>' + fmtBytes(exp[1] || 0) + "</b></div>";
+        if (exp[2]) html += "<div>Export time: " + exp[2] + "</div>";
+        if (ll[0] !== "MISSING" && ll[1] && exp[1] && +exp[1] > 0) {
+          var diff = Math.abs(+ll[1] - +exp[1]);
+          if (diff < 64) html += '<div class="ok">Export matches live size.</div>';
+          else if (+exp[1] < +ll[1]) html += '<div class="warn">Live log is newer / larger than last export.</div>';
+        }
+      }
+      el.innerHTML = html;
+    });
+  }
+
   $("clr").addEventListener("click", function () {
     sh("rm -f " + D + "/codm_tex.log").then(function (r) {
       toast(demo ? "Demo mode — nothing deleted." : (r.errno === 0 ? "Log cleared." : "Could not clear the log."));
-      refresh();
+      refreshLogStat();
     });
   });
+
+  $("logref").addEventListener("click", function () { refreshLogStat(); });
+
   $("vlog").addEventListener("click", function () {
     $("logt").textContent = "Loading…";
     $("logw").classList.add("open");
@@ -1331,10 +1431,12 @@ textarea {
         var n = parseInt(r.stdout.split("OK")[1], 10) || 0;
         toast("Exported " + Math.max(1, Math.round(n / 1024)) + " KB to CODM Log/codm_tex.log");
       } else toast("Could not export the log.");
+    refreshLogStat();
     });
   });
 
   refresh();
+  refreshLogStat();
 })();
 </script>
 </body>
