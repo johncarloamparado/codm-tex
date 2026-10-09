@@ -1,6 +1,6 @@
 id=codm_tex_logger
 name=CODM Blocky Textures
-version=v0.16
-versionCode=17
+version=v0.17
+versionCode=18
 author=Q9 Papyrus
 description=Blocky low-detail textures with a Redmi-style mode (original colors), texture groups, skip list and start delay for CODM, plus a WebUI and frame logger.

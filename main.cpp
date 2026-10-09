@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <sched.h>
 #include <cstdio>
+#include <ctime>
 #include <cstring>
 #include <cstdint>
 #include <thread>
@@ -147,7 +148,8 @@ static inline int64_t now_ns();
 static std::atomic<int> g_minsz{64};                 /* minsz.txt: mas maliit dito = hindi ginagalaw */
 static std::atomic<int> g_delay{0};                  /* delay.txt: segundo mula sa launch na hindi ginagalaw */
 static std::atomic<int64_t> g_tstart{0};
-static std::vector<std::pair<int, int>> g_skip;      /* skip.txt: "fmt size" (size 0 = lahat ng laki); binabasa sa simula lang */
+struct Sk { int fmt, a, b; };
+static std::vector<Sk> g_skip;                       /* skip.txt: "fmt size" (size 0 = lahat) o "fmt w h"; binabasa sa simula lang */
 struct Grp { int fmt; int sz; int n; int ap; };
 static const int MAXG = 96;
 static Grp g_grp[MAXG];
@@ -162,9 +164,24 @@ static void grp_note(int fmt, int sz, bool applied) {
     if (g_ng < MAXG) { g_grp[g_ng].fmt = fmt; g_grp[g_ng].sz = sz; g_grp[g_ng].n = 1; g_grp[g_ng].ap = applied ? 1 : 0; g_ng++; g_gdirty = 1; }
 }
 
-static bool in_skip(int fmt, int sz) {
-    for (auto &p : g_skip) if (p.first == fmt && (p.second == 0 || p.second == sz)) return true;
+static bool in_skip(int fmt, int w, int h) {
+    int sz = std::max(w, h);
+    for (auto &p : g_skip) {
+        if (p.fmt != fmt) continue;
+        if (p.b == 0) { if (p.a == 0 || p.a == sz) return true; }
+        else if (p.a == w && p.b == h) return true;
+    }
     return false;
+}
+
+/* v17: TEXN = bawat texture na ginawa (oras ng phone), para matukoy ang scope/reddot sa pamamagitan ng paghahambing ng dalawang log */
+static std::atomic<int> g_texn{0};
+static void texn_log(int w, int h, int lv, int fmt, bool cand) {
+    int n = ++g_texn;
+    if (n > 6000) return;
+    time_t tt = time(nullptr); struct tm tmv; localtime_r(&tt, &tmv);
+    L("TEXN %02d:%02d:%02d t=%.1f %dx%d lv=%d fmt=0x%x cand=%d\n", tmv.tm_hour, tmv.tm_min, tmv.tm_sec,
+      (now_ns() - g_tstart.load()) / 1e9, w, h, lv, fmt, cand ? 1 : 0);
 }
 
 static void (*o_st)(GLenum, GLsizei, GLenum, GLsizei, GLsizei) = nullptr;
@@ -173,8 +190,9 @@ static void h_st(GLenum t, GLsizei lv, GLenum fmt, GLsizei w, GLsizei h) {
     int b = g_bias.load(), k = g_blk.load();
     int mx = std::max(w, h);
     bool cand = (t == GL_TEXTURE_2D && lv >= 3 && mx >= 64 && is_cmp(fmt));
+    if (t == GL_TEXTURE_2D && mx >= 16) texn_log((int)w, (int)h, (int)lv, (int)fmt, cand);
     if (!cand) return;
-    bool skip = in_skip((int)fmt, mx) || mx < g_minsz.load();
+    bool skip = in_skip((int)fmt, (int)w, (int)h) || mx < g_minsz.load();
     int dl = g_delay.load();
     if (!skip && dl > 0 && now_ns() - g_tstart.load() < (int64_t)dl * 1000000000LL) skip = true;
     int sty = g_style.load();
@@ -811,8 +829,13 @@ static void load_cfg() {
     g_skip.clear();
     f = fopen(SKIPF, "r");
     if (f) {
-        int a = 0, c = 0;
-        while (g_skip.size() < 64 && fscanf(f, "%d %d", &a, &c) == 2) g_skip.push_back({a, c});
+        char ln[96];
+        while (g_skip.size() < 128 && fgets(ln, sizeof ln, f)) {
+            int a = 0, b = 0, c = 0;
+            int n = sscanf(ln, "%d %d %d", &a, &b, &c);
+            if (n == 2) g_skip.push_back({a, b, 0});
+            else if (n == 3) g_skip.push_back({a, b, c});
+        }
         fclose(f);
     }
     f = fopen(STYF, "r");
@@ -935,7 +958,7 @@ static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
     std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
-    L("=== start v16 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load());
+    L("=== start v17 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load());
     int total = (mode == 1) ? 60 : 1200;
     for (int i = 0; i < total; i++) {
         if (mode >= 2) {
@@ -978,7 +1001,7 @@ public:
         int mode = read_mode();
         if (mode == 4) {
             load_cfg();
-            L("=== start v16 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load());
+            L("=== start v17 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load());
             hook_nativeloader();
             return;
         }
