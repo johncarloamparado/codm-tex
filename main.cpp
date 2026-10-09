@@ -46,6 +46,8 @@
 #define MINF DIR "minsz.txt"
 #define DLYF DIR "delay.txt"
 #define SKIPF DIR "skip.txt"
+#define STYF DIR "style.txt"
+#define SEDF DIR "sedge.txt"
 
 static std::mutex mu;
 static FILE *lf = nullptr;
@@ -104,16 +106,34 @@ static void h_del(GLsizei n, const GLuint *ids) {
     if (o_del) o_del(n, ids);
 }
 
+/* ---------- v16: Redmi style (style.txt = 0 patay | 1..4 = min LOD; sedge.txt = 1 -> matalim na gilid) ---------- */
+static std::atomic<int> g_style{0};
+static std::atomic<int> g_sedge{1};
+#define TEX_MIN_LOD 0x813A
+#define TEX_ANISO 0x84FE
+
 static void h_tp(GLenum t, GLenum p, GLint v) {
+    int st = g_style.load();
+    if (st > 0 && p == TEX_ANISO && v > 1) v = 1;          /* anisotropic 1X */
     if (t == GL_TEXTURE_2D && (p == GL_TEXTURE_MIN_FILTER || p == GL_TEXTURE_MAG_FILTER)) {
         GLuint id = tl_bound[tl_unit];
         if (id > 0 && id < MAXTEX && g_tf[id].load()) {
-            if (p == GL_TEXTURE_MAG_FILTER) v = GL_NEAREST;
-            else v = GL_NEAREST;
-            g_forced++;
+            if (st > 0) {
+                /* Redmi style: MAG lang ang NEAREST; ang orihinal na MIN (mipmap) filter ay hindi ginagalaw */
+                if (p == GL_TEXTURE_MAG_FILTER) { v = GL_NEAREST; g_forced++; }
+            } else {
+                v = GL_NEAREST;
+                g_forced++;
+            }
         }
     }
     if (real_tp) real_tp(t, p, v);
+}
+
+static void (*o_tpf)(GLenum, GLenum, GLfloat) = nullptr;
+static void h_tpf(GLenum t, GLenum p, GLfloat v) {
+    if (g_style.load() > 0 && p == TEX_ANISO && v > 1.0f) v = 1.0f;   /* anisotropic 1X */
+    if (o_tpf) o_tpf(t, p, v);
 }
 
 static void (*o_smp)(GLuint, GLenum, GLint) = nullptr;
@@ -157,6 +177,26 @@ static void h_st(GLenum t, GLsizei lv, GLenum fmt, GLsizei w, GLsizei h) {
     bool skip = in_skip((int)fmt, mx) || mx < g_minsz.load();
     int dl = g_delay.load();
     if (!skip && dl > 0 && now_ns() - g_tstart.load() < (int64_t)dl * 1000000000LL) skip = true;
+    int sty = g_style.load();
+    if (sty > 0) {
+        /* Redmi style: buong mip chain at orihinal na kulay/filter; itinataas lang ang pinakamababang LOD (parang global mip LOD bias) */
+        int lod = skip ? 0 : std::min(sty, (int)lv - 2);
+        grp_note((int)fmt, mx, lod > 0);
+        if (lod > 0 && real_tp) {
+            real_tp(GL_TEXTURE_2D, TEX_MIN_LOD, lod);
+            if (g_sedge.load()) {
+                GLuint id = tl_bound[tl_unit];
+                if (id > 0 && id < MAXTEX) {
+                    g_tf[id] = 1; g_flagged++;
+                    real_tp(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                }
+            }
+            int n = ++g_applied;
+            if (n <= 100 || n % 500 == 0)
+                L("STYLE #%d %dx%d lv=%d fmt=0x%x lod=%d edge=%d\n", n, w, h, lv, fmt, lod, g_sedge.load());
+        }
+        return;
+    }
     int base = 0;
     if (!skip) {
         if (k > 0) {
@@ -485,6 +525,16 @@ static void th_log(long long frame, float ms, double t_s) {
 
 static inline double tv_ms(const timeval &a) { return a.tv_sec * 1000.0 + a.tv_usec / 1000.0; }
 
+static void log_gl_info() {
+    typedef const GLubyte *(*gs_t)(GLenum);
+    gs_t gs = (gs_t)dlsym(RTLD_DEFAULT, "glGetString");
+    if (!gs) { void *h = dlopen("libGLESv3.so", RTLD_NOW); if (h) gs = (gs_t)dlsym(h, "glGetString"); }
+    if (!gs) { L("GLINFO glGetString n/a\n"); return; }
+    const char *r = (const char *)gs(GL_RENDERER), *v = (const char *)gs(GL_VERSION), *e = (const char *)gs(GL_EXTENSIONS);
+    L("GLINFO renderer=%s version=%s\n", r ? r : "?", v ? v : "?");
+    L("GLINFO ext lod_bias=%d aniso=%d\n", (e && strstr(e, "lod_bias")) ? 1 : 0, (e && strstr(e, "anisotropic")) ? 1 : 0);
+}
+
 static EGLBoolean (*o_swap)(EGLDisplay, EGLSurface) = nullptr;
 static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     int64_t t_pre = now_ns();
@@ -510,6 +560,7 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     int64_t t = t_post;
     if (g_t0.load() == 0) g_t0 = t;
     frame_no++;
+    if (frame_no == 30) log_gl_info();
 
     /* FPS cap: tulugan ang natitirang oras para pantay ang pagitan ng frames */
     int cap = g_fps.load();
@@ -638,8 +689,9 @@ static int32_t h_sbg(ANativeWindow *w, int32_t ww, int32_t hh, int32_t f) {
 
 static void *wrap(const char *n, void *r) {
     if (!n || !r) return r;
-    if (!strcmp(n, "glTexParameteri")) { if (!real_tp) real_tp = (decltype(real_tp))r; return g_near.load() ? (void *)h_tp : r; }
-    if (g_near.load()) {
+    if (!strcmp(n, "glTexParameteri")) { if (!real_tp) real_tp = (decltype(real_tp))r; return (g_near.load() || g_style.load()) ? (void *)h_tp : r; }
+    if (!strcmp(n, "glTexParameterf")) { if (!o_tpf) o_tpf = (decltype(o_tpf))r; return g_style.load() ? (void *)h_tpf : r; }
+    if (g_near.load() || g_style.load()) {
         if (!strcmp(n, "glActiveTexture")) { if (!o_act) o_act = (decltype(o_act))r; return (void *)h_act; }
         if (!strcmp(n, "glBindTexture")) { if (!o_bind) o_bind = (decltype(o_bind))r; return (void *)h_bind; }
         if (!strcmp(n, "glDeleteTextures")) { if (!o_del) o_del = (decltype(o_del))r; return (void *)h_del; }
@@ -763,6 +815,24 @@ static void load_cfg() {
         while (g_skip.size() < 64 && fscanf(f, "%d %d", &a, &c) == 2) g_skip.push_back({a, c});
         fclose(f);
     }
+    f = fopen(STYF, "r");
+    if (f) {
+        int v = 0;
+        if (fscanf(f, "%d", &v) == 1) g_style = std::max(0, std::min(v, 4));
+        fclose(f);
+    } else {
+        f = fopen(STYF, "w");
+        if (f) { fprintf(f, "0\n"); fclose(f); }
+    }
+    f = fopen(SEDF, "r");
+    if (f) {
+        int v = 1;
+        if (fscanf(f, "%d", &v) == 1) g_sedge = v ? 1 : 0;
+        fclose(f);
+    } else {
+        f = fopen(SEDF, "w");
+        if (f) { fprintf(f, "1\n"); fclose(f); }
+    }
     g_tstart = now_ns();
     f = fopen(COREF, "r");
     if (f) {
@@ -794,7 +864,8 @@ static void reg_hooks(dev_t dv, ino_t in) {
     lsplt::RegisterHook(dv, in, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
     lsplt::RegisterHook(dv, in, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
     lsplt::RegisterHook(dv, in, "glTexStorage2D", (void *)h_st, (void **)&o_st);
-    if (g_near.load()) {
+    if (g_style.load()) lsplt::RegisterHook(dv, in, "glTexParameterf", (void *)h_tpf, (void **)&o_tpf);
+    if (g_near.load() || g_style.load()) {
         lsplt::RegisterHook(dv, in, "glTexParameteri", (void *)h_tp, (void **)&real_tp);
         lsplt::RegisterHook(dv, in, "glActiveTexture", (void *)h_act, (void **)&o_act);
         lsplt::RegisterHook(dv, in, "glBindTexture", (void *)h_bind, (void **)&o_bind);
@@ -864,7 +935,7 @@ static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
     std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* kailan unang nakita ang libunity */
-    L("=== start v15 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size());
+    L("=== start v16 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load());
     int total = (mode == 1) ? 60 : 1200;
     for (int i = 0; i < total; i++) {
         if (mode >= 2) {
@@ -907,7 +978,7 @@ public:
         int mode = read_mode();
         if (mode == 4) {
             load_cfg();
-            L("=== start v15 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size());
+            L("=== start v16 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load());
             hook_nativeloader();
             return;
         }
