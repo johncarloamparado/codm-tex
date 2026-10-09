@@ -157,6 +157,32 @@ input[type=range]:disabled{opacity:.4}
   </section>
 
   <section class="card">
+    <h2>Fine tuning</h2>
+    <p class="cap">Leave some textures original so floors, menus and small items look right.</p>
+    <div class="row">
+      <div class="rh"><label for="minsz">Smallest texture to change</label><span class="val" id="minszV">64 px</span></div>
+      <p class="desc">Textures smaller than this stay original. Raise it if small items such as scopes look wrong.</p>
+      <input type="range" id="minsz" min="0" max="5" step="1" value="0">
+    </div>
+    <div class="row">
+      <div class="rh"><label for="delay">Start delay</label><span class="val" id="delayV">Off</span></div>
+      <p class="desc">Textures created in the first seconds after launch stay original. Helps the main menu.</p>
+      <input type="range" id="delay" min="0" max="12" step="1" value="0">
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Texture groups</h2>
+    <p class="cap">Switch a group off to leave it original. Play one match first so this list can fill in.</p>
+    <div id="groups"></div>
+    <div class="grid2">
+      <button class="btn" id="gref" type="button">Refresh list</button>
+      <button class="btn" id="gall" type="button">Turn all on</button>
+    </div>
+    <p class="pnote">A group is one texture format and size. Walls and floors can share a group, so switching it off affects both.</p>
+  </section>
+
+  <section class="card">
     <h2>Logging</h2>
     <p class="cap">Writes codm_tex.log so we can find the cause of stutter.</p>
     <button class="sw" id="fz" role="switch" aria-checked="true" type="button">
@@ -177,7 +203,7 @@ input[type=range]:disabled{opacity:.4}
       <button class="btn primary" id="stop" type="button">Apply for CODM</button>
       <div class="grid2" style="margin-top:0">
         <button class="btn" id="vlog" type="button">View log</button>
-        <button class="btn" id="exp" type="button">Export full log</button>
+        <button class="btn" id="exp" type="button">Export log</button>
       </div>
       <div class="grid2" style="margin-top:0">
         <button class="btn" id="clr" type="button">Clear log</button>
@@ -204,10 +230,11 @@ input[type=range]:disabled{opacity:.4}
   var BLKN = ["Off", "Soft", "Fine", "Medium", "Chunky", "Extreme"];
   var BLKCOLS = [160, 80, 48, 28, 16, 9];
   var FPS = [0, 30, 40, 45, 60, 72, 90, 120];
-  var REC = {blk:16, bias:0, near:1, scale:0, fps:0, fz:1, th:1, core:1};
+  var MINS = [64, 128, 256, 512, 1024, 2048];
+  var REC = {blk:16, bias:0, near:1, scale:0, fps:0, fz:1, th:1, core:1, minsz:64, delay:0};
 
   var demo = (typeof ksu === "undefined");
-  var fake = {blk:"16", bias:"0", near:"1", scale:"0", fps:"0", fz:"1", th:"1", core:"1", mode:"4", ft:"FT fps=55.2 avg=18.1ms n=276 fz=1"};
+  var fake = {blk:"16", bias:"0", near:"1", scale:"0", fps:"0", fz:"1", th:"1", core:"1", mode:"4", minsz:"64", delay:"0", skip:"", texg:"TEXG t=60 fmt=37812 hex=0x93b4 sz=1024 n=40 ap=40\nTEXG t=60 fmt=37812 hex=0x93b4 sz=2048 n=6 ap=6\nTEXG t=60 fmt=37815 hex=0x93b7 sz=512 n=120 ap=120", ft:"FT fps=55.2 avg=18.1ms n=276 fz=1"};
   var seq = 0, cfg = {};
 
   function $(id){ return document.getElementById(id); }
@@ -262,12 +289,14 @@ input[type=range]:disabled{opacity:.4}
   function readState(){
     if (demo) return Promise.resolve(Object.assign({}, fake));
     var cmd = "D=" + D + "; [ -d $D ] || { echo NODIR; exit 0; }; " +
-      "for f in blk bias near scale fps fz th core mode; do echo $f=$(cat $D/$f.txt 2>/dev/null); done; " +
-      "echo ft=$(grep '^FT' $D/codm_tex.log 2>/dev/null | tail -n 1)";
+      "for f in blk bias near scale fps fz th core mode minsz delay; do echo $f=$(cat $D/$f.txt 2>/dev/null); done; " +
+      "echo ft=$(grep '^FT' $D/codm_tex.log 2>/dev/null | tail -n 1); " +
+      "echo ---SKIP; cat $D/skip.txt 2>/dev/null; echo ---TEXG; grep '^TEXG' $D/codm_tex.log 2>/dev/null | tail -n 300";
     return sh(cmd).then(function(r){
       if (r.stdout.indexOf("NODIR") >= 0) return {nodir:true};
-      var o = {};
-      r.stdout.split("\n").forEach(function(l){ var i = l.indexOf("="); if (i > 0) o[l.slice(0,i).trim()] = l.slice(i+1).trim(); });
+      var o = {}, parts = r.stdout.split("---SKIP\n"), tail = parts[1] || "", sp = tail.split("---TEXG\n");
+      parts[0].split("\n").forEach(function(l){ var i = l.indexOf("="); if (i > 0) o[l.slice(0,i).trim()] = l.slice(i+1).trim(); });
+      o.skip = sp[0] || ""; o.texg = sp[1] || "";
       if (r.errno !== 0 && !Object.keys(o).length) o.err = r.stderr || ("errno " + r.errno);
       return o;
     });
@@ -457,9 +486,70 @@ input[type=range]:disabled{opacity:.4}
     setSw("fz", s.fz !== "0"); setSw("th", s.th !== "0"); setSw("core", s.core !== "0");
     $("scaleV").textContent = $("scale").value + "%"; fill($("scale"));
     $("fpsV").textContent = f ? FPS[$("fps").value] : "Off"; fill($("fps"));
+    var ms = parseInt(s.minsz, 10) || 64, mi = 0, di = Math.max(0, Math.min(12, Math.round((parseInt(s.delay, 10) || 0) / 5)));
+    MINS.forEach(function(v, i){ if (Math.abs(v - ms) < Math.abs(MINS[mi] - ms)) mi = i; });
+    $("minsz").value = mi; $("minszV").textContent = MINS[mi] + " px"; fill($("minsz"));
+    $("delay").value = di; $("delayV").textContent = di ? (di * 5) + " s" : "Off"; fill($("delay"));
+    parseGroups(s.skip || "", s.texg || ""); renderGroups();
     updateTexUI(); updateStatus();
     var m = /fps=([\d.]+)/.exec(s.ft || ""), z = /fz=(\d+)/.exec(s.ft || "");
     $("stat").textContent = m ? ("Last logged: " + Math.round(parseFloat(m[1])) + " fps" + (z ? ", " + z[1] + " freeze" + (z[1] === "1" ? "" : "s") + " in that 5 s window" : "")) : "No frame data yet.";
+  }
+  /* ---------- texture groups ---------- */
+  var groups = [], skipSet = {}, extraSkip = [];
+  function fmtName(f){
+    var e = {0x9270:"R11 EAC", 0x9271:"R11 EAC signed", 0x9272:"RG11 EAC", 0x9273:"RG11 EAC signed", 0x9274:"ETC2 RGB", 0x9275:"ETC2 sRGB",
+             0x9276:"ETC2 RGB+A1", 0x9277:"ETC2 sRGB+A1", 0x9278:"ETC2 RGBA", 0x9279:"ETC2 sRGBA"};
+    var A = ["4x4","5x4","5x5","6x5","6x5","8x5","8x6","8x8","10x5","10x6","10x8","10x10","12x10","12x12"];
+    A[4] = "6x6";
+    if (e[f]) return e[f];
+    if (f >= 0x93b0 && f <= 0x93bd) return "ASTC " + A[f - 0x93b0];
+    if (f >= 0x93d0 && f <= 0x93dd) return "ASTC " + A[f - 0x93d0] + " sRGB";
+    return "Format 0x" + f.toString(16);
+  }
+  function parseGroups(skipText, texgText){
+    var map = {}, i, m, re = /fmt=(\d+)\s+hex=\S+\s+sz=(\d+)\s+n=(\d+)\s+ap=(\d+)/;
+    skipSet = {}; extraSkip = [];
+    skipText.split("\n").forEach(function(l){
+      m = /^\s*(\d+)\s+(\d+)\s*$/.exec(l); if (!m) return;
+      if (m[2] === "0") extraSkip.push(l.trim()); else skipSet[m[1] + "|" + m[2]] = 1;
+    });
+    texgText.split("\n").forEach(function(l){
+      m = re.exec(l); if (!m) return;
+      map[m[1] + "|" + m[2]] = {fmt:+m[1], sz:+m[2], n:+m[3], ap:+m[4]};
+    });
+    Object.keys(skipSet).forEach(function(k){ if (!map[k]){ var a = k.split("|"); map[k] = {fmt:+a[0], sz:+a[1], n:0, ap:0}; } });
+    groups = Object.keys(map).map(function(k){ return map[k]; });
+    groups.sort(function(a, b){ return b.sz - a.sz || b.n - a.n; });
+  }
+  function writeSkip(){
+    var lines = extraSkip.slice();
+    Object.keys(skipSet).forEach(function(k){ lines.push(k.replace("|", " ")); });
+    if (demo) return Promise.resolve({ok:true});
+    var cmd = "D=" + D + "; [ -d $D ] || { echo NODIR; exit 1; }; ";
+    cmd += lines.length ? ("printf '%s\\n' " + lines.map(function(l){ return '"' + l + '"'; }).join(" ") + " > $D/skip.txt; ") : ": > $D/skip.txt; ";
+    cmd += "chmod 666 $D/skip.txt 2>/dev/null; echo OK";
+    return sh(cmd).then(function(r){ r.ok = r.stdout.indexOf("OK") >= 0; return r; });
+  }
+  function renderGroups(){
+    var box = $("groups"); box.innerHTML = "";
+    if (!groups.length){
+      var p = document.createElement("p"); p.className = "desc"; p.textContent = "No groups yet. Play a match with the logs on, then tap Refresh list."; box.appendChild(p); return;
+    }
+    groups.forEach(function(g){
+      var key = g.fmt + "|" + g.sz;
+      var b = document.createElement("button"); b.className = "sw"; b.type = "button"; b.setAttribute("role", "switch");
+      b.setAttribute("aria-checked", skipSet[key] ? "false" : "true");
+      b.innerHTML = '<span><span class="t"></span><span class="d"></span></span><span class="knob"></span>';
+      b.querySelector(".t").textContent = fmtName(g.fmt) + ", " + g.sz + " px";
+      b.querySelector(".d").textContent = g.n ? (g.n + " texture" + (g.n === 1 ? "" : "s") + " seen") : "Not seen in the current log";
+      b.addEventListener("click", function(){
+        if (skipSet[key]) delete skipSet[key]; else skipSet[key] = 1;
+        b.setAttribute("aria-checked", skipSet[key] ? "false" : "true");
+        writeSkip().then(function(r){ toast(r.ok ? "Saved. Tap Apply for CODM." : "Could not save the list."); });
+      });
+      box.appendChild(b);
+    });
   }
   function refresh(){ return readState().then(render); }
 
@@ -471,6 +561,12 @@ input[type=range]:disabled{opacity:.4}
   });
   $("scale").addEventListener("input", function(){ $("scaleV").textContent = $("scale").value + "%"; fill($("scale")); updateStatus(); });
   $("scale").addEventListener("change", function(){ var v = parseInt($("scale").value, 10); save({scale:v >= 100 ? 0 : v}, "Render scale"); });
+  $("minsz").addEventListener("input", function(){ $("minszV").textContent = MINS[parseInt($("minsz").value, 10)] + " px"; fill($("minsz")); });
+  $("minsz").addEventListener("change", function(){ save({minsz:MINS[parseInt($("minsz").value, 10)]}, "Smallest texture"); });
+  $("delay").addEventListener("input", function(){ var d = parseInt($("delay").value, 10); $("delayV").textContent = d ? (d * 5) + " s" : "Off"; fill($("delay")); });
+  $("delay").addEventListener("change", function(){ save({delay:parseInt($("delay").value, 10) * 5}, "Start delay"); });
+  $("gref").addEventListener("click", function(){ refresh().then(function(){ toast("List refreshed"); }); });
+  $("gall").addEventListener("click", function(){ skipSet = {}; extraSkip = []; writeSkip().then(function(r){ renderGroups(); toast(r.ok ? "All groups on. Tap Apply for CODM." : "Could not save the list."); }); });
   $("fps").addEventListener("input", function(){ var f = FPS[parseInt($("fps").value, 10)]; $("fpsV").textContent = f ? f : "Off"; fill($("fps")); updateStatus(); });
   $("fps").addEventListener("change", function(){ save({fps:FPS[parseInt($("fps").value, 10)]}, "Frame rate cap"); });
   ["fz", "th", "core"].forEach(function(k){
@@ -490,7 +586,7 @@ input[type=range]:disabled{opacity:.4}
     sh("tail -n 80 " + D + "/codm_tex.log 2>&1").then(function(r){ $("logt").textContent = r.stdout.trim() || "The log is empty."; $("logt").scrollTop = $("logt").scrollHeight; });
   });
   $("logx").addEventListener("click", function(){ $("logw").classList.remove("open"); });
-  $("reset").addEventListener("click", function(){ save(REC, "Recommended settings").then(refresh); });
+  $("reset").addEventListener("click", function(){ save(REC, "Defaults").then(function(){ skipSet = {}; extraSkip = []; return writeSkip(); }).then(refresh); });
 
   /* sliders: hindi gumagalaw sa simpleng tap sa track; ang bilog lang ang puwedeng i-drag */
   Array.prototype.forEach.call(document.querySelectorAll("input[type=range]"), function(el){
