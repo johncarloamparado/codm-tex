@@ -47,6 +47,7 @@
 #define MINF DIR "minsz.txt"
 #define DLYF DIR "delay.txt"
 #define SKIPF DIR "skip.txt"
+#define BLOFFF DIR "bltoff.txt"
 #define STYF DIR "style.txt"
 #define SEDF DIR "sedge.txt"
 #define FLATF DIR "flat.txt"
@@ -67,8 +68,8 @@ static void L(const char *fmt, ...) {
 }
 
 /* ---------- Stage 2: mip bias ---------- */
-static std::atomic<int> g_scale{65};       /* 0 = off; 20-99 = % of native resolution */
-static std::atomic<int> g_bias{2};
+static std::atomic<int> g_scale{0};        /* 0 = off; 20-99 = % of native resolution */
+static std::atomic<int> g_bias{0};
 static std::atomic<int> g_applied{0};
 static void (*real_tp)(GLenum, GLenum, GLint) = nullptr;
 
@@ -80,7 +81,7 @@ static bool is_cmp(GLenum f) {
 /* near.txt: 0 = off | 1 = on (default). Only matters when block/bias path is active.
    Flagged textures are forced to NEAREST filtering = mosaic blocks. */
 static std::atomic<int> g_near{1};
-static std::atomic<int> g_blk{16};      /* blk.txt: target size (px) per texture; 0 = use bias.txt */
+static std::atomic<int> g_blk{0};       /* blk.txt: target size (px) per texture; 0 = use bias.txt */
 static std::atomic<int> g_flagged{0}, g_forced{0}, g_smp{0};
 static const GLuint MAXTEX = 1u << 18;
 static std::atomic<uint8_t> g_tf[1u << 18];        /* 1 = texture forced to NEAREST */
@@ -118,7 +119,7 @@ static std::atomic<int> g_sedge{1};
 static std::atomic<int> g_flat{0};
 static std::atomic<int> g_ttsize{0};   /* ttsize.txt: -2 finer (mip0 only, shimmer) | -1 fine (mips capped at level 3) | 0 normal | 1..3 bigger pixels (2x,4x,8x) */
 static std::atomic<int> g_ttsm{0};     /* ttsm.txt: 0 sharp | 1 soft mip blend */
-static std::atomic<int> g_testtex{0};  /* testtex.txt: 0 off | 1 = Test Tex (NEAREST only, full mips) */
+static std::atomic<int> g_testtex{1};  /* testtex.txt: 0 off | 1 = Test Tex (NEAREST only, full mips) */
 #define TEX_MIN_LOD 0x813A
 #define TEX_MAX_LEVEL 0x813D
 #define TEX_ANISO 0x84FE
@@ -184,9 +185,10 @@ static void h_smp(GLuint s, GLenum p, GLint v) {
 /* ---------- Stage 9: texture groups, skip list, min size, start delay ---------- */
 static inline int64_t now_ns();
 static std::atomic<int> g_minsz{64};                 /* minsz.txt: smaller than this = leave untouched */
-static std::atomic<int> g_delay{0};                  /* delay.txt: seconds after launch with no texture changes */
+static std::atomic<int> g_delay{20};                  /* delay.txt: seconds after launch with no texture changes */
 static std::atomic<int64_t> g_tstart{0};
 struct Sk { int fmt, a, b; };
+static std::vector<Sk> g_bloff;                      /* bltoff.txt: built-in skips turned off from the WebUI; read at startup only */
 static std::vector<Sk> g_skip;                       /* skip.txt: "fmt size" (size 0 = all) or "fmt w h"; read at startup only */
 struct Grp { int fmt; int sz; int n; int ap; };
 static const int MAXG = 96;
@@ -202,7 +204,7 @@ static void grp_note(int fmt, int sz, bool applied) {
     if (g_ng < MAXG) { g_grp[g_ng].fmt = fmt; g_grp[g_ng].sz = sz; g_grp[g_ng].n = 1; g_grp[g_ng].ap = applied ? 1 : 0; g_ng++; g_gdirty = 1; }
 }
 
-/* Permanent skips (compiled in; Reset/skip.txt cannot remove these).
+/* Default skips (compiled in; can be turned off per line with bltoff.txt from the WebUI).
    37497 256x512 = Lava Remix scope/reticle atlas.
    37493/37492/37497 128x128 = partial character-detail protection. */
 static const Sk g_builtin[] = {
@@ -214,8 +216,13 @@ static const Sk g_builtin[] = {
 
 static bool in_skip(int fmt, int w, int h) {
     int sz = std::max(w, h);
-    for (auto &p : g_builtin)
-        if (p.fmt == fmt && p.a == w && p.b == h) return true;
+    for (auto &p : g_builtin) {
+        if (p.fmt != fmt || p.a != w || p.b != h) continue;
+        bool off = false;
+        for (auto &o : g_bloff)
+            if (o.fmt == p.fmt && o.a == p.a && o.b == p.b) { off = true; break; }
+        if (!off) return true;
+    }
     for (auto &p : g_skip) {
         if (p.fmt != fmt) continue;
         if (p.b == 0) { if (p.a == 0 || p.a == sz) return true; }
@@ -862,7 +869,7 @@ static void load_cfg() {
         fclose(f);
     } else {
         f = fopen(CFGF, "w");
-        if (f) { fprintf(f, "2\n"); fclose(f); }
+        if (f) { fprintf(f, "0\n"); fclose(f); }
     }
     f = fopen(FPSF, "r");
     if (f) {
@@ -880,7 +887,7 @@ static void load_cfg() {
         fclose(f);
     } else {
         f = fopen(SCLF, "w");
-        if (f) { fprintf(f, "65\n"); fclose(f); }
+        if (f) { fprintf(f, "0\n"); fclose(f); }
     }
     f = fopen(FZF, "r");
     if (f) {
@@ -916,7 +923,7 @@ static void load_cfg() {
         fclose(f);
     } else {
         f = fopen(BLKF, "w");
-        if (f) { fprintf(f, "16\n"); fclose(f); }
+        if (f) { fprintf(f, "0\n"); fclose(f); }
     }
     f = fopen(MINF, "r");
     if (f) {
@@ -934,7 +941,7 @@ static void load_cfg() {
         fclose(f);
     } else {
         f = fopen(DLYF, "w");
-        if (f) { fprintf(f, "0\n"); fclose(f); }
+        if (f) { fprintf(f, "20\n"); fclose(f); }
     }
     g_skip.clear();
     f = fopen(SKIPF, "r");
@@ -945,6 +952,16 @@ static void load_cfg() {
             int n = sscanf(ln, "%d %d %d", &a, &b, &c);
             if (n == 2) g_skip.push_back({a, b, 0});
             else if (n == 3) g_skip.push_back({a, b, c});
+        }
+        fclose(f);
+    }
+    g_bloff.clear();
+    f = fopen(BLOFFF, "r");
+    if (f) {
+        char ln[96];
+        while (g_bloff.size() < 16 && fgets(ln, sizeof ln, f)) {
+            int a = 0, b = 0, c = 0;
+            if (sscanf(ln, "%d %d %d", &a, &b, &c) == 3) g_bloff.push_back({a, b, c});
         }
         fclose(f);
     }
@@ -982,7 +999,7 @@ static void load_cfg() {
         fclose(f);
     } else {
         f = fopen(TTEXF, "w");
-        if (f) { fprintf(f, "0\n"); fclose(f); }
+        if (f) { fprintf(f, "1\n"); fclose(f); }
     }
     f = fopen(TTSZF, "r");
     if (f) {
@@ -1016,14 +1033,14 @@ static void load_cfg() {
 
 /* mode.txt: 0 = idle | 1 = thread only | 2 = thread + find libunity (no hooks) | 3 = full hooks (polling) | 4 = hook at libunity load (no poll thread) */
 static int read_mode() {
-    int v = 0;
+    int v = 4;                                   /* no mode.txt yet = active (4) */
     FILE *f = fopen(MODEF, "r");
     if (f) {
         if (fscanf(f, "%d", &v) != 1) v = 0;
         fclose(f);
     } else {
         f = fopen(MODEF, "w");
-        if (f) { fprintf(f, "0\n"); fclose(f); }
+        if (f) { fprintf(f, "4\n"); fclose(f); }
     }
     return std::max(0, std::min(v, 4));
 }
