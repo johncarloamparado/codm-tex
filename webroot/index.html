@@ -3,31 +3,37 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#06070c">
 <title>CODM Blocky Textures</title>
 <style>
 :root {
   --bg: #06070c;
-  --card: rgba(16, 19, 32, 0.78);
-  --card-solid: #101320;
-  --line: rgba(255, 255, 255, 0.10);
+  --card-a: rgba(25, 29, 52, 0.88);
+  --card-b: rgba(15, 18, 32, 0.88);
+  --fill: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.09);
   --text: #eef1ff;
   --mute: #8b93b0;
   --accent: #8fa4ff;
   --accent2: #c5d0ff;
+  --violet: #b69cff;
   --ink: #0a0e1c;
   --warn: #ffd27a;
   --bad: #ff8f88;
   --ok: #7de2a8;
   --track: rgba(255, 255, 255, 0.12);
-  --nav-h: 64px;
-  --apply-h: 56px;
+  --dock-h: 62px;
   box-sizing: border-box;
+  color-scheme: dark;
 }
-*, *::before, *::after { box-sizing: inherit; }
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html {
   background: var(--bg);
-  scroll-padding-top: env(safe-area-inset-top, 0);
-  scroll-padding-bottom: calc(var(--nav-h) + var(--apply-h) + env(safe-area-inset-bottom, 0));
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-bottom: calc(var(--dock-h) + 30px + env(safe-area-inset-bottom, 0px));
 }
 body {
   margin: 0;
@@ -35,447 +41,305 @@ body {
   background: transparent;
   font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-tap-highlight-color: transparent;
-  padding-bottom: calc(var(--nav-h) + var(--apply-h) + env(safe-area-inset-bottom, 0px) + 16px);
+  padding-bottom: calc(var(--dock-h) + 38px + env(safe-area-inset-bottom, 0px));
 }
-body.lock {
-  overflow: hidden;
-  position: fixed;
-  left: 0;
-  right: 0;
-  width: 100%;
-}
+body.lock { overflow: hidden; position: fixed; left: 0; right: 0; width: 100%; }
 
-#stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -2; display: block; }
+#stars { position: fixed; left: 0; top: 0; z-index: -2; display: block; pointer-events: none; }
 
-main {
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 18px 16px 8px;
-  position: relative;
-}
+main { max-width: 560px; margin: 0 auto; padding: 4px 16px 8px; position: relative; }
 
-header { padding: 14px 2px 4px; }
-h1 {
-  margin: 0;
-  font-size: 26px;
-  line-height: 1.15;
-  font-weight: 300;
-  letter-spacing: 0.01em;
+/* ---------- header ---------- */
+.hd { padding: calc(16px + env(safe-area-inset-top, 0px)) 2px 2px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { flex: none; width: 46px; height: 46px; }
+.bt { flex: 1; min-width: 0; }
+.eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.24em; color: var(--accent); text-transform: uppercase; }
+h1 { margin: 1px 0 0; font-size: 25px; line-height: 1.1; font-weight: 700; letter-spacing: -0.01em; }
+.by { margin: 3px 0 0; color: var(--mute); font-size: 12px; }
+.by b { color: var(--accent2); font-weight: 600; }
+.ver {
+  flex: none; align-self: flex-start;
+  padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--fill);
+  color: var(--accent2); font-size: 11.5px; font-weight: 650;
 }
-h1 b { font-weight: 650; }
-.status {
-  margin-top: 5px;
-  color: var(--mute);
-  font-size: 13px;
+.status { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  background: var(--fill); border: 1px solid var(--line);
+  color: var(--accent2); font-size: 12px; font-weight: 600; line-height: 1.3;
 }
-.by {
-  margin: 2px 0 0;
-  color: var(--accent2);
-  font-size: 12px;
-  opacity: 0.8;
-}
+.chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--mute); }
+.chip.on i { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.chip.msg { color: var(--mute); font-weight: 500; }
 
+/* ---------- views & cards ---------- */
 .view { display: none; }
-.view.active { display: block; }
+.view.active { display: block; animation: vin 0.2s ease-out both; }
+@keyframes vin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 .card {
-  margin-top: 14px;
-  padding: 16px 15px;
-  border-radius: 20px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  margin-top: 12px; padding: 16px 15px;
+  border-radius: 22px; border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--card-a), var(--card-b));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .card { background: var(--card-solid); }
+.ch { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+h2 { margin: 0; font-size: 16px; font-weight: 650; }
+.tag {
+  flex: none; padding: 2px 9px; border-radius: 999px;
+  background: rgba(255, 210, 122, 0.12); color: var(--warn);
+  font-size: 11px; font-weight: 650;
 }
+.tag.n { background: rgba(143, 164, 255, 0.14); color: var(--accent2); }
+.cap { margin: 3px 0 13px; color: var(--mute); font-size: 12.5px; line-height: 1.4; }
+.cap b { color: var(--accent2); font-weight: 600; }
 
-h2 {
-  margin: 0 0 2px;
-  font-size: 16px;
-  font-weight: 600;
-}
-.cap {
-  margin: 0 0 12px;
-  color: var(--mute);
-  font-size: 12.5px;
-  line-height: 1.4;
-}
-
-.row { margin-top: 16px; }
-.row:first-of-type { margin-top: 2px; }
-.rh {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-}
-.rh label, .rh .lb {
-  font-weight: 600;
-  font-size: 14px;
-}
+.row { margin-top: 18px; }
+.cap + .row { margin-top: 2px; }
+.rh { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.rh label, .rh .lb { font-weight: 650; font-size: 14px; }
 .val {
-  flex: none;
-  padding: 2px 11px;
-  border-radius: 999px;
-  background: rgba(143, 164, 255, 0.14);
-  color: var(--accent2);
-  font-size: 13px;
-  font-weight: 600;
-  min-width: 58px;
-  text-align: center;
+  flex: none; min-width: 58px; padding: 2px 11px; border-radius: 999px;
+  background: rgba(143, 164, 255, 0.14); color: var(--accent2);
+  font-size: 13px; font-weight: 650; text-align: center;
 }
-.desc {
-  margin: 2px 0 7px;
-  color: var(--mute);
-  font-size: 12.5px;
-  line-height: 1.35;
-}
+.desc { margin: 2px 0 8px; color: var(--mute); font-size: 12.5px; line-height: 1.35; }
+.pnote { margin: 8px 2px 0; color: var(--mute); font-size: 11.5px; line-height: 1.4; }
+.pnote b { color: var(--accent2); font-weight: 600; }
 
-/* segmented control */
-.seg {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--line);
+/* ---------- look tiles ---------- */
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mode {
+  position: relative; display: flex; flex-direction: column; gap: 3px;
+  align-items: flex-start; text-align: left;
+  min-height: 70px; padding: 11px 12px 10px;
+  border-radius: 16px; border: 1px solid var(--line); background: var(--fill);
+  color: var(--text); font: inherit; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
 }
-.seg button {
-  flex: 1;
-  min-height: 38px;
-  border: 0;
-  border-radius: 11px;
-  background: transparent;
-  color: var(--mute);
-  font: inherit;
-  font-weight: 600;
-  font-size: 12px;
-  cursor: pointer;
+.mode .mt { display: flex; align-items: center; gap: 8px; }
+.mode svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; color: var(--mute); }
+.mode b { font-size: 14px; font-weight: 650; }
+.mode small { color: var(--mute); font-size: 11.5px; line-height: 1.3; }
+.mode[aria-checked="true"] { border-color: rgba(143, 164, 255, 0.7); background: rgba(143, 164, 255, 0.13); }
+.mode[aria-checked="true"] svg { color: var(--accent2); }
+.mode[aria-checked="true"]::after {
+  content: ""; position: absolute; top: 11px; right: 11px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 8px var(--accent);
+}
+.mode:focus-visible, .step:focus-visible, .btn:focus-visible, .ib:focus-visible, .sw:focus-visible,
+#dock button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+
+/* ---------- preview ---------- */
+.pv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 0; justify-items: center; }
+.pv figure { margin: 0; width: 100%; max-width: 142px; text-align: center; }
+.pv canvas { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); background: #0b0e1a; }
+.pv figcaption { margin-top: 6px; color: var(--mute); font-size: 11.5px; }
+.pv figcaption b { color: var(--accent2); font-weight: 650; }
+
+/* ---------- step chips ---------- */
+.steps { display: grid; grid-template-columns: repeat(var(--n, 5), 1fr); gap: 6px; }
+.step {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  min-height: 44px; padding: 6px 2px;
+  border-radius: 13px; border: 1px solid var(--line); background: var(--fill);
+  color: var(--text); font: inherit; cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
-.seg button.on {
-  background: var(--accent);
-  color: var(--ink);
-}
-.seg button:focus-visible {
-  outline: 2px solid var(--accent2);
-  outline-offset: 1px;
-}
+.step b { font-size: 12.5px; font-weight: 650; }
+.step small { color: var(--mute); font-size: 10.5px; }
+.step[aria-checked="true"] { background: linear-gradient(180deg, var(--accent2), var(--accent)); border-color: transparent; color: var(--ink); }
+.step[aria-checked="true"] small { color: rgba(10, 14, 28, 0.7); }
+.steps[aria-disabled="true"] { opacity: 0.38; pointer-events: none; }
 
-/* range */
+/* ---------- sliders (large invisible grab handle keeps dragging easy) ---------- */
 .sl { position: relative; --f: 0; }
 .grab {
-  position: absolute;
-  top: 50%;
-  left: calc(12px + (100% - 24px) * var(--f));
-  width: 52px;
-  height: 52px;
-  margin: -26px 0 0 -26px;
-  border-radius: 50%;
-  touch-action: none;
-  cursor: grab;
-  z-index: 1;
+  position: absolute; top: 50%; left: calc(12px + (100% - 24px) * var(--f));
+  width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
+  touch-action: none; cursor: grab; z-index: 1;
 }
 .grab:active { cursor: grabbing; }
 input[type=range] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 34px;
-  margin: 0;
-  background: transparent;
-  pointer-events: none;
-  --p: 50%;
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 34px; margin: 0;
+  background: transparent; pointer-events: none; --p: 50%;
 }
 input[type=range]::-webkit-slider-runnable-track {
-  height: 7px;
-  border-radius: 99px;
-  background: linear-gradient(90deg, var(--accent) var(--p), var(--track) var(--p));
-}
-input[type=range]::-moz-range-track {
-  height: 7px;
-  border-radius: 99px;
-  background: var(--track);
-}
-input[type=range]::-moz-range-progress {
-  height: 7px;
-  border-radius: 99px;
-  background: var(--accent);
+  height: 8px; border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent) 0, var(--violet) var(--p), var(--track) var(--p));
 }
 input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 24px;
-  height: 24px;
-  margin-top: -8.5px;
-  border-radius: 50%;
-  background: #fff;
-  border: 0;
+  -webkit-appearance: none; width: 26px; height: 26px; margin-top: -9px;
+  border-radius: 50%; background: #fff; border: 0;
   box-shadow: 0 0 0 4px rgba(143, 164, 255, 0.22), 0 0 12px rgba(143, 164, 255, 0.7);
 }
-input[type=range]::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #fff;
-  border: 0;
-  box-shadow: 0 0 0 4px rgba(143, 164, 255, 0.22), 0 0 12px rgba(143, 164, 255, 0.7);
-}
-input[type=range]:focus-visible {
-  outline: 2px solid var(--accent2);
-  outline-offset: 3px;
-  border-radius: 10px;
-}
-input[type=range]:disabled { opacity: 0.35; }
+input[type=range]:focus-visible { outline: 2px solid var(--accent2); outline-offset: 3px; border-radius: 10px; }
 
-/* switches */
+/* ---------- switches ---------- */
 .sw {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 48px;
-  padding: 5px 0;
-  background: none;
-  border: 0;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  width: 100%; min-height: 50px; padding: 6px 0;
+  background: none; border: 0; color: var(--text);
+  font: inherit; text-align: left; cursor: pointer;
 }
 .sw + .sw { border-top: 1px solid var(--line); }
-.sw .t { font-weight: 600; font-size: 14px; display: block; }
+.sw .t { font-weight: 650; font-size: 14px; display: block; }
 .sw .d { display: block; color: var(--mute); font-size: 12.5px; font-weight: 400; margin-top: 1px; }
-.knob {
-  flex: none;
-  position: relative;
-  width: 46px;
-  height: 28px;
-  border-radius: 99px;
-  background: var(--track);
-  transition: background 0.15s;
-}
+.sw.dim { opacity: 0.5; }
+.knob { flex: none; position: relative; width: 46px; height: 28px; border-radius: 99px; background: var(--track); transition: background 0.15s; }
 .knob::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #fff;
+  content: ""; position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px; border-radius: 50%; background: #fff;
   transition: transform 0.15s;
 }
 .sw[aria-checked="true"] .knob { background: var(--accent); }
 .sw[aria-checked="true"] .knob::after { transform: translateX(18px); }
-.sw:focus-visible {
-  outline: 2px solid var(--accent2);
-  outline-offset: 2px;
-  border-radius: 10px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .knob, .knob::after { transition: none; }
-}
+#groups .sw { content-visibility: auto; contain-intrinsic-size: auto 52px; }
 
-.pnote {
-  margin: 7px 2px 0;
-  color: var(--mute);
-  font-size: 11.5px;
-}
-
-/* buttons */
+/* ---------- buttons ---------- */
 .btn {
-  display: block;
-  width: 100%;
-  min-height: 46px;
-  padding: 9px 14px;
-  font: inherit;
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  cursor: pointer;
+  display: block; width: 100%; min-height: 46px; padding: 9px 14px;
+  font: inherit; font-weight: 650; font-size: 14px; color: var(--text);
+  background: var(--fill); border: 1px solid var(--line); border-radius: 14px; cursor: pointer;
 }
-.btn.primary {
-  background: linear-gradient(180deg, var(--accent2), var(--accent));
-  color: var(--ink);
-  border-color: transparent;
+.btn.warn { color: var(--warn); }
+.btn.armed { background: rgba(255, 143, 136, 0.16); border-color: var(--bad); color: var(--bad); }
+.btn:active, .mode:active, .step:active { transform: scale(0.985); }
+.ib {
+  flex: none; width: 34px; height: 34px; padding: 0; display: grid; place-items: center;
+  border-radius: 11px; border: 1px solid var(--line); background: var(--fill);
+  color: var(--accent2); cursor: pointer;
 }
-.btn:focus-visible {
-  outline: 2px solid var(--accent2);
-  outline-offset: 2px;
-}
-.btn:active { transform: scale(0.985); }
-.grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-  margin-top: 9px;
-}
+.ib svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; }
 .stack { display: grid; gap: 9px; }
 
 .banner {
-  margin-top: 12px;
-  padding: 11px 13px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  font-size: 13px;
+  margin-top: 12px; padding: 11px 13px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--card-b); font-size: 13px;
 }
 .banner.warn { border-color: var(--warn); color: var(--warn); }
 .banner.bad { border-color: var(--bad); color: var(--bad); }
 .banner .btn { margin-top: 9px; min-height: 40px; }
 
 textarea {
-  display: block;
-  width: 100%;
-  min-height: 100px;
-  padding: 10px 11px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: #07090f;
-  color: #c8d0f0;
-  font: 12.5px/1.45 ui-monospace, Menlo, Consolas, monospace;
-  resize: vertical;
-}
-.stat {
-  margin-top: 11px;
-  padding-top: 11px;
-  border-top: 1px solid var(--line);
-  color: var(--mute);
-  font-size: 12.5px;
-}
-.foot {
-  margin: 18px 2px 6px;
-  color: var(--mute);
-  font-size: 12px;
-  text-align: center;
+  display: block; width: 100%; min-height: 100px; padding: 10px 11px;
+  border-radius: 12px; border: 1px solid var(--line); background: #07090f; color: #c8d0f0;
+  font: 12.5px/1.45 ui-monospace, Menlo, Consolas, monospace; resize: vertical;
 }
 
-/* sticky apply bar + bottom nav */
-#applybar {
-  position: fixed;
-  left: 0; right: 0;
-  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
-  z-index: 41;
-  padding: 8px 14px;
-  background: rgba(6, 7, 12, 0.94);
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
-  border-top: 1px solid var(--line);
-}
-#applybar .inner {
-  max-width: 560px;
-  margin: 0 auto;
-}
-#applybar .btn {
-  min-height: 40px;
-  border-radius: 12px;
-  font-size: 14px;
-}
+/* ---------- stat tiles ---------- */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tile { padding: 11px 4px 9px; border-radius: 14px; background: var(--fill); border: 1px solid var(--line); text-align: center; }
+.tile b { display: block; font-size: 20px; line-height: 1.15; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tile span { display: block; margin-top: 2px; color: var(--mute); font-size: 10.5px; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase; }
+.legend { list-style: none; margin: 13px 0 0; padding: 0; display: grid; gap: 7px; color: var(--mute); font-size: 12px; line-height: 1.4; }
+.legend b { color: var(--accent2); font-weight: 650; }
+.tile.ok b { color: var(--ok); }
+.tile.warn b { color: var(--warn); }
 
-#nav {
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
-  z-index: 40;
-  padding: 0 12px env(safe-area-inset-bottom, 0);
-  background: rgba(6, 7, 12, 0.92);
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
-  border-top: 1px solid var(--line);
+/* ---------- log status, details, key/values ---------- */
+.logstat {
+  margin-top: 2px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--line); background: rgba(0, 0, 0, 0.28);
+  font-size: 12px; line-height: 1.55; word-break: break-word;
 }
-#nav .inner {
-  max-width: 560px;
-  margin: 0 auto;
-  display: flex;
-  height: var(--nav-h);
-}
-#nav button {
-  flex: 1;
-  border: 0;
-  background: none;
-  color: var(--mute);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  cursor: pointer;
-  padding: 0;
-}
-#nav button svg {
-  width: 22px;
-  height: 22px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-#nav button.on { color: var(--accent2); }
-#nav button:focus-visible {
-  outline: 2px solid var(--accent2);
-  outline-offset: -4px;
-  border-radius: 10px;
-}
+.logstat b { color: var(--accent2); font-weight: 650; }
+.logstat .ok { color: #7ddea0; }
+.logstat .warn { color: #e8c27a; }
+.logstat .bad { color: #f0a0a0; }
+.logstat .startline { opacity: 0.85; font-size: 11px; margin-top: 2px; }
+.logstat .expgap { margin-top: 6px; }
 
-/* toast & log */
+details summary { list-style: none; cursor: pointer; border-radius: 10px; }
+details summary::-webkit-details-marker { display: none; }
+summary svg { flex: none; width: 20px; height: 20px; stroke: var(--mute); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s; }
+details[open] summary svg { transform: rotate(180deg); }
+details .body { margin-top: 12px; }
+
+.kv { display: flex; justify-content: space-between; gap: 14px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.kv:first-child { border-top: 0; padding-top: 2px; }
+.kv span { color: var(--mute); }
+.kv b { font-weight: 600; text-align: right; word-break: break-all; }
+.kv b.ok { color: var(--ok); }
+.kv b.warn { color: var(--warn); }
+
+.foot { margin: 18px 2px 6px; color: var(--mute); font-size: 12px; text-align: center; line-height: 1.5; }
+
+/* ---------- dock ---------- */
+#dock {
+  position: fixed; left: 12px; right: 12px; z-index: 40;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  max-width: 536px; margin: 0 auto; height: var(--dock-h);
+  display: flex; align-items: center; gap: 6px; padding: 6px;
+  border-radius: 24px; border: 1px solid var(--line);
+  background: rgba(13, 16, 29, 0.97); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+#dock .tabs { flex: 1; min-width: 0; height: 100%; display: flex; }
+#dock .tabs button {
+  flex: 1; height: 100%; padding: 0; border: 0; border-radius: 18px; background: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  color: var(--mute); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer;
+}
+#dock .tabs svg, .apply svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#dock .tabs button.on { color: var(--accent2); background: rgba(143, 164, 255, 0.13); }
+.apply {
+  flex: none; position: relative; height: 100%; padding: 0 18px;
+  display: flex; align-items: center; gap: 7px;
+  border: 0; border-radius: 18px;
+  background: linear-gradient(135deg, var(--accent2), var(--accent) 55%, var(--violet));
+  color: var(--ink); font: inherit; font-weight: 750; font-size: 14px; cursor: pointer;
+}
+.apply svg { width: 18px; height: 18px; stroke-width: 2.1; }
+.apply:active { transform: scale(0.97); }
+.apply::after {
+  content: ""; display: none; position: absolute; top: 6px; right: 6px;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--warn); border: 2px solid var(--ink);
+}
+body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.3); opacity: 0.65; } }
+
+/* ---------- toast & log window ---------- */
 #toast {
-  position: fixed;
-  left: 14px; right: 14px;
-  bottom: calc(var(--nav-h) + var(--apply-h) + 14px + env(safe-area-inset-bottom, 0px));
-  max-width: 532px;
-  margin: 0 auto;
-  padding: 12px 15px;
-  border-radius: 16px;
-  background: var(--text);
-  color: #0a0d18;
-  font-weight: 600;
-  font-size: 13.5px;
-  text-align: center;
-  opacity: 0;
-  transform: translateY(8px);
-  pointer-events: none;
+  position: fixed; left: 14px; right: 14px; z-index: 50;
+  bottom: calc(var(--dock-h) + 24px + env(safe-area-inset-bottom, 0px));
+  max-width: 532px; margin: 0 auto; padding: 12px 15px;
+  border-radius: 16px; background: var(--text); color: #0a0d18;
+  font-weight: 650; font-size: 13.5px; text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  opacity: 0; transform: translateY(8px); pointer-events: none;
   transition: opacity 0.18s, transform 0.18s;
-  z-index: 50;
 }
 #toast.show { opacity: 1; transform: none; }
 #logw {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: none;
+  position: fixed; inset: 0; z-index: 60; display: none;
   padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(14px + env(safe-area-inset-bottom, 0px));
-  background: rgba(2, 3, 8, 0.92);
-  overscroll-behavior: contain;
-  touch-action: none;
+  background: rgba(2, 3, 8, 0.94); overscroll-behavior: contain; touch-action: none;
 }
 #logw.open { display: flex; flex-direction: column; gap: 9px; }
+#logw h3 { margin: 0 2px; font-size: 13px; font-weight: 650; color: var(--mute); }
 #logw pre {
-  flex: 1;
-  margin: 0;
-  padding: 12px;
-  overflow: auto;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: #07090f;
-  color: #c8d0f0;
+  flex: 1; margin: 0; padding: 12px; overflow: auto;
+  border-radius: 14px; border: 1px solid var(--line); background: #07090f; color: #c8d0f0;
   font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace;
-  white-space: pre-wrap;
-  word-break: break-all;
-  touch-action: pan-y;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  white-space: pre-wrap; word-break: break-all;
+  touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 340px) {
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .mode small { display: none; }
+  .mode { min-height: 52px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #toast { transition: none; }
+  .view.active, body.pend .apply::after { animation: none; }
+  .knob, .knob::after, #toast, .mode, .step, summary svg { transition: none; }
 }
 </style>
 </head>
@@ -483,29 +347,72 @@ textarea {
 <canvas id="stars" aria-hidden="true"></canvas>
 
 <main>
-  <header>
-    <h1>CODM <b>Blocky Textures</b></h1>
-    <p class="status" id="status">Reading settings…</p>
-    <p class="by">by Q9 Papyrus</p>
+  <header class="hd">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
+        <defs>
+          <linearGradient id="lg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="44" y2="44">
+            <stop offset="0" stop-color="#c5d0ff"/><stop offset="1" stop-color="#8fa4ff"/>
+          </linearGradient>
+        </defs>
+        <g fill="url(#lg)">
+          <rect x="3" y="3" width="11" height="11" rx="3"/>
+          <rect x="16.5" y="3" width="11" height="11" rx="3" opacity=".55"/>
+          <rect x="30" y="3" width="11" height="11" rx="3" opacity=".22"/>
+          <rect x="3" y="16.5" width="11" height="11" rx="3" opacity=".55"/>
+          <rect x="16.5" y="16.5" width="11" height="11" rx="3"/>
+          <rect x="30" y="16.5" width="11" height="11" rx="3" opacity=".55"/>
+          <rect x="3" y="30" width="11" height="11" rx="3" opacity=".22"/>
+          <rect x="16.5" y="30" width="11" height="11" rx="3" opacity=".55"/>
+          <rect x="30" y="30" width="11" height="11" rx="3"/>
+        </g>
+      </svg>
+      <div class="bt">
+        <p class="eyebrow">CODM</p>
+        <h1>Blocky Textures</h1>
+        <p class="by">by <b>Q9 Papyrus</b></p>
+      </div>
+      <span class="ver" id="ver" hidden></span>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite"><span class="chip msg">Reading settings…</span></div>
   </header>
   <div id="banner"></div>
 
   <!-- ========== HOME ========== -->
   <div class="view active" id="v-home">
     <section class="card">
-      <h2>Look</h2>
-      <p class="cap">Choose one look. Turning one on turns the others off. Flat is experimental.</p>
-      <div class="seg" id="lookSeg" role="group" aria-label="Look mode">
-        <button type="button" data-m="0" class="on">Off</button>
-        <button type="button" data-m="1">Blocks</button>
-        <button type="button" data-m="2">Detail</button>
-        <button type="button" data-m="3">Flat</button>
+      <div class="ch"><h2>Look</h2><span class="tag">Flat is experimental</span></div>
+      <p class="cap">Choose one look. Turning one on turns the others off.</p>
+
+      <div class="modes" id="lookSeg" role="radiogroup" aria-label="Look mode">
+        <button type="button" class="mode" role="radio" aria-checked="true" data-m="0">
+          <span class="mt"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M6 18 18 6"/></svg><b>Off</b></span>
+          <small>Original textures</small>
+        </button>
+        <button type="button" class="mode" role="radio" aria-checked="false" data-m="1">
+          <span class="mt"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><b>Pixel Blocks</b></span>
+          <small>Chunky mosaic look</small>
+        </button>
+        <button type="button" class="mode" role="radio" aria-checked="false" data-m="2">
+          <span class="mt"><svg viewBox="0 0 24 24"><path d="M4 7h16M6.5 12h11M9 17h6"/></svg><b>Detail Cut</b></span>
+          <small>Less fine detail</small>
+        </button>
+        <button type="button" class="mode" role="radio" aria-checked="false" data-m="3">
+          <span class="mt"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5"/></svg><b>Flat</b></span>
+          <small>Near-solid colors</small>
+        </button>
       </div>
 
-      <div class="row" id="strRow">
-        <div class="rh"><label for="str">Strength</label><span class="val" id="strV">—</span></div>
+      <div class="pv" aria-hidden="true">
+        <figure><canvas id="pvA" width="256" height="256"></canvas><figcaption>Original</figcaption></figure>
+        <figure><canvas id="pvB" width="256" height="256"></canvas><figcaption id="pvBc">No look</figcaption></figure>
+      </div>
+      <p class="pnote">Sample texture, approximate. Real results depend on each texture's size.</p>
+
+      <div class="row">
+        <div class="rh"><span class="lb" id="strL">Strength</span><span class="val" id="strV">—</span></div>
         <p class="desc" id="strD">Pick a look above first.</p>
-        <input type="range" id="str" min="1" max="5" step="1" value="3" disabled>
+        <div class="steps" id="steps" role="radiogroup" aria-labelledby="strL"></div>
       </div>
     </section>
 
@@ -518,9 +425,9 @@ textarea {
         <input type="range" id="scale" min="40" max="100" step="5" value="100">
       </div>
       <div class="row">
-        <div class="rh"><label for="fps">Frame rate cap</label><span class="val" id="fpsV">Off</span></div>
+        <div class="rh"><span class="lb" id="fpsL">Frame rate cap</span><span class="val" id="fpsV">Off</span></div>
         <p class="desc">Stops the game from going above this many frames per second.</p>
-        <input type="range" id="fps" min="0" max="7" step="1" value="0">
+        <div class="steps" id="fpsBox" role="radiogroup" aria-labelledby="fpsL" style="--n:4"></div>
       </div>
     </section>
 
@@ -533,6 +440,25 @@ textarea {
         <input type="range" id="delay" min="0" max="12" step="1" value="0">
       </div>
     </section>
+
+    <section class="card">
+      <div class="ch"><h2>Last session</h2>
+        <button class="ib" id="sref" type="button" aria-label="Refresh stats"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+      </div>
+      <p class="cap" id="sstat">No frame data yet. Play a match to fill this in.</p>
+      <div class="tiles">
+        <div class="tile"><b id="tFps">—</b><span>FPS</span></div>
+        <div class="tile"><b id="tAvg">—</b><span>Avg ms</span></div>
+        <div class="tile"><b id="tP99">—</b><span>99th ms</span></div>
+        <div class="tile" id="tFzT"><b id="tFz">—</b><span>Freezes</span></div>
+      </div>
+      <ul class="legend">
+        <li><b>FPS</b> — frames drawn per second. Higher is smoother.</li>
+        <li><b>Avg ms</b> — average time per frame. 16.7 ms is 60 FPS and 33 ms is 30 FPS. Lower is better.</li>
+        <li><b>99th ms</b> — 99 out of 100 frames were faster than this. If it is far above Avg, the game stutters.</li>
+        <li><b>Freezes</b> — frames that took longer than 100 ms in this window. Ideally 0.</li>
+      </ul>
+    </section>
   </div>
 
   <!-- ========== ADVANCED ========== -->
@@ -541,14 +467,14 @@ textarea {
       <h2>Fine tuning</h2>
       <p class="cap">Leave very small textures alone so icons, scopes and UI stay clear.</p>
       <div class="row">
-        <div class="rh"><label for="minsz">Smallest texture to change</label><span class="val" id="minszV">64 px</span></div>
+        <div class="rh"><span class="lb" id="minL">Smallest texture to change</span><span class="val" id="minszV">64 px</span></div>
         <p class="desc">Anything smaller than this stays original.</p>
-        <input type="range" id="minsz" min="0" max="5" step="1" value="0">
+        <div class="steps" id="minBox" role="radiogroup" aria-labelledby="minL" style="--n:6"></div>
       </div>
     </section>
 
     <section class="card">
-      <h2>Texture groups</h2>
+      <div class="ch"><h2>Texture groups</h2><span class="tag n" id="gcount" hidden></span></div>
       <p class="cap">Turn a group off to leave those textures original. Play one match first so the list can fill in.</p>
       <div id="groups"></div>
       <div class="grid2">
@@ -559,41 +485,35 @@ textarea {
     </section>
 
     <section class="card">
-      <h2>Skip list</h2>
-      <p class="cap">One group per line. Use <b>format size</b> or <b>format width height</b>. Textures in these groups stay original. A few built-in skips are always on and cannot be removed here.</p>
-      <textarea id="skipt" rows="5" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Skip list"></textarea>
-      <div class="grid2">
-        <button class="btn" id="skips" type="button">Save list</button>
-        <button class="btn" id="skipr" type="button">Reload</button>
-      </div>
-      <p class="pnote">Numbers come from the log (for example 37496 is ETC2 RGBA). Tap Apply after saving.</p>
+      <details id="skipd">
+        <summary class="ch"><h2>Skip list</h2><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="body">
+          <p class="cap">One group per line. Use <b>format size</b> or <b>format width height</b>. Textures in these groups stay original. A few built-in skips are always on and cannot be removed here.</p>
+          <textarea id="skipt" rows="5" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Skip list"></textarea>
+          <div class="grid2">
+            <button class="btn" id="skips" type="button">Save list</button>
+            <button class="btn" id="skipr" type="button">Reload</button>
+          </div>
+          <p class="pnote">Numbers come from the log (for example 37496 is ETC2 RGBA). Tap Apply after saving.</p>
+        </div>
+      </details>
     </section>
 
     <section class="card">
       <h2>Logging</h2>
       <p class="cap">Writes codm_tex.log so freezes can be examined later.</p>
       <button class="sw" id="fz" role="switch" aria-checked="true" type="button">
-        <span>
-          <span class="t">Freeze log</span>
-          <span class="d">Records every frame that takes longer than 100 ms</span>
-        </span>
+        <span><span class="t">Freeze log</span><span class="d">Records every frame that takes longer than 100 ms</span></span>
         <span class="knob"></span>
       </button>
       <button class="sw" id="th" role="switch" aria-checked="true" type="button">
-        <span>
-          <span class="t">Thread log</span>
-          <span class="d">Shows which threads were busy during a freeze</span>
-        </span>
+        <span><span class="t">Thread log</span><span class="d">Shows which threads were busy during a freeze</span></span>
         <span class="knob"></span>
       </button>
       <button class="sw" id="core" role="switch" aria-checked="true" type="button">
-        <span>
-          <span class="t">Core log</span>
-          <span class="d">Needs both logs above</span>
-        </span>
+        <span><span class="t">Core log</span><span class="d">Needs both logs above</span></span>
         <span class="knob"></span>
       </button>
-      <p class="stat" id="stat">No frame data yet.</p>
     </section>
   </div>
 
@@ -601,13 +521,17 @@ textarea {
   <div class="view" id="v-tools">
     <section class="card">
       <h2>Log</h2>
-      <p class="cap">View, export or clear the frame log.</p>
+      <p class="cap">View, export or clear the frame log (codm_tex.log).</p>
+      <div id="logStat" class="logstat">Checking log…</div>
       <div class="stack" style="margin-top:10px">
         <div class="grid2" style="margin-top:0">
           <button class="btn" id="vlog" type="button">View log</button>
           <button class="btn" id="exp" type="button">Export log</button>
         </div>
-        <button class="btn" id="clr" type="button">Clear log</button>
+        <div class="grid2" style="margin-top:0">
+          <button class="btn warn" id="clr" type="button">Clear log</button>
+          <button class="btn" id="logref" type="button">Refresh status</button>
+        </div>
       </div>
       <p class="pnote">Export saves to <b>CODM Log/codm_tex.log</b> in internal storage and replaces the previous file.</p>
     </section>
@@ -615,25 +539,26 @@ textarea {
     <section class="card">
       <h2>Reset</h2>
       <p class="cap">Puts every setting back to the defaults shipped with the module.</p>
-      <div class="stack" style="margin-top:10px">
-        <button class="btn" id="reset" type="button">Reset defaults</button>
-      </div>
+      <button class="btn warn" id="reset" type="button">Reset defaults</button>
     </section>
 
-    <p class="foot">The Apply button at the bottom works from any tab. Settings take effect the next time CODM starts.</p>
+    <section class="card">
+      <h2>About</h2>
+      <div class="kv" style="margin-top:8px"><span>Module</span><b>CODM Blocky Textures</b></div>
+      <div class="kv"><span>Version</span><b id="aVer">—</b></div>
+      <div class="kv"><span>Author</span><b>Q9 Papyrus</b></div>
+      <div class="kv"><span>Module mode</span><b id="aMode">—</b></div>
+      <div class="kv"><span>Settings folder</span><b style="font-size:11.5px;font-weight:500">/data/data/com.garena.game.codm/files</b></div>
+      <p class="pnote">Module mode 4 hooks the game's engine the moment it loads, with no background polling. That is the mode this module needs. Modes 0–3 are only for testing.</p>
+    </section>
+
+    <p class="foot">Settings are read when CODM starts. Apply closes the game so your next launch uses them.</p>
   </div>
 </main>
 
-<!-- always-visible Apply bar -->
-<div id="applybar">
-  <div class="inner">
-    <button class="btn primary" id="stop" type="button">Apply for CODM</button>
-  </div>
-</div>
-
-<!-- bottom navigation -->
-<nav id="nav" aria-label="Main">
-  <div class="inner">
+<!-- dock: tabs + always-visible Apply -->
+<nav id="dock" aria-label="Main">
+  <div class="tabs">
     <button type="button" data-v="home" class="on" aria-current="page">
       <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
       Home
@@ -647,9 +572,14 @@ textarea {
       Tools
     </button>
   </div>
+  <button class="apply" id="stop" type="button" aria-label="Apply for CODM">
+    <svg viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/></svg>
+    Apply
+  </button>
 </nav>
 
 <div id="logw" role="dialog" aria-modal="true" aria-label="Log">
+  <h3>codm_tex.log · last 80 lines</h3>
   <pre id="logt"></pre>
   <button class="btn" id="logx" type="button">Close</button>
 </div>
@@ -659,14 +589,15 @@ textarea {
 (function () {
   var D = "/data/data/com.garena.game.codm/files";
   var PKG = "com.garena.game.codm";
+  var PROP = "/data/adb/modules/codm_tex_logger/module.prop";
 
   /* Pixel Blocks sizes (index 0 = Off is handled by mode) */
   var BLK = [0, 64, 32, 16, 8, 4];
   var BLKN = ["Off", "Soft", "Fine", "Medium", "Chunky", "Extreme"];
-
-  /* Detail Cut levels */
-  var DCN = ["Off", "Light", "Medium", "Strong", "Extreme"];
-  var FLATN = ["Off", "Light", "Medium", "Strong", "Extreme"];
+  /* Detail Cut / Flat strength names */
+  var LVN = ["Off", "Light", "Medium", "Strong", "Extreme"];
+  /* Flat target size per strength (mirrors FTGT in the module) */
+  var FTGT = [0, 8, 4, 2, 1];
 
   var FPS = [0, 30, 40, 45, 60, 72, 90, 120];
   var MINS = [64, 128, 256, 512, 1024, 2048];
@@ -683,15 +614,22 @@ textarea {
     blk: "0", bias: "0", near: "1", scale: "0", fps: "0",
     fz: "1", th: "1", core: "1", mode: "4",
     minsz: "64", delay: "0", style: "0", sedge: "1", flat: "0",
-    skip: "",
-    texg: "TEXG t=60 fmt=37812 hex=0x93b4 sz=1024 n=40 ap=40\nTEXG t=60 fmt=37812 hex=0x93b4 sz=2048 n=6 ap=6\nTEXG t=60 fmt=37815 hex=0x93b7 sz=512 n=120 ap=120",
-    ft: "FT fps=55.2 avg=18.1ms n=276 fz=1"
+    skip: "", ver: "v0.20",
+    texg: "TEXG t=60 fmt=37812 hex=0x93b4 sz=1024 n=40 ap=40\nTEXG t=60 fmt=37812 hex=0x93b4 sz=2048 n=6 ap=6\nTEXG t=60 fmt=37815 hex=0x93b7 sz=512 n=120 ap=120\nTEXG t=60 fmt=37496 hex=0x9278 sz=256 n=64 ap=60\nTEXG t=60 fmt=37497 hex=0x9279 sz=512 n=12 ap=0",
+    ft: "FT fps=55.2 avg=18.1ms p50=17.6 p99=41.3 max=63.0 >33ms=3 >50ms=1 n=276 cap=0 bias=0 scale=100 t=125.0 fz=1"
   };
-  var seq = 0, cfg = {};
-  var lookMode = 0;   /* 0=Off  1=Pixel Blocks  2=Detail Cut */
-  var strVal = 3;     /* 1-5 for blocks, 1-4 for detail cut */
+  var seq = 0;
+  var lookMode = 0;   /* 0=Off  1=Pixel Blocks  2=Detail Cut  3=Flat */
+  var strVal = 3;     /* 1-5 for blocks, 1-4 for detail cut / flat */
+  var fpsVal = 0, minVal = 64;
+  var groups = [], skipSet = {}, extraSkip = [];
 
   function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
   function toast(m) {
     var e = $("toast");
     e.textContent = m;
@@ -699,22 +637,47 @@ textarea {
     clearTimeout(toast.t);
     toast.t = setTimeout(function () { e.classList.remove("show"); }, 2600);
   }
+  function setPend(on) { document.body.classList.toggle("pend", !!on); }
+  function kv(line) {
+    var o = {}, re = /([^\s=]+)=(\S+)/g, m;
+    while ((m = re.exec(line))) o[m[1]] = m[2];
+    return o;
+  }
+  function num(v, d) {
+    var n = parseFloat(v);
+    return isNaN(n) ? "—" : (d ? n.toFixed(d) : String(Math.round(n)));
+  }
 
-  /* ---------- stars ---------- */
+  /* ---------- stars (drawn once; cheap and never repainted on scroll) ---------- */
   function rng(seed) {
     return function () {
       seed = (seed * 1664525 + 1013904223) >>> 0;
       return seed / 4294967296;
     };
   }
+  var starW = 0;
   function drawStars() {
     var c = $("stars"), dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var w = window.innerWidth, h = window.innerHeight;
+    var w = window.innerWidth;
+    var h = Math.max(window.innerHeight, (window.screen && screen.height) || 0);
+    starW = w;
     c.width = Math.round(w * dpr);
     c.height = Math.round(h * dpr);
+    c.style.width = w + "px";
+    c.style.height = h + "px";
     var x = c.getContext("2d");
     x.scale(dpr, dpr);
     x.fillStyle = "#06070c";
+    x.fillRect(0, 0, w, h);
+    var g = x.createRadialGradient(w * 0.15, 0, 0, w * 0.15, 0, h * 0.55);
+    g.addColorStop(0, "rgba(143,164,255,0.17)");
+    g.addColorStop(1, "rgba(143,164,255,0)");
+    x.fillStyle = g;
+    x.fillRect(0, 0, w, h);
+    g = x.createRadialGradient(w, h, 0, w, h, h * 0.5);
+    g.addColorStop(0, "rgba(182,156,255,0.11)");
+    g.addColorStop(1, "rgba(182,156,255,0)");
+    x.fillStyle = g;
     x.fillRect(0, 0, w, h);
     var r = rng(20260), n = Math.round(w * h / 1800), i;
     for (i = 0; i < n; i++) {
@@ -733,7 +696,8 @@ textarea {
   var rz;
   window.addEventListener("resize", function () {
     clearTimeout(rz);
-    rz = setTimeout(drawStars, 200);
+    /* keyboard open/close only changes the height; redraw on width change only */
+    rz = setTimeout(function () { if (window.innerWidth !== starW) drawStars(); }, 200);
   });
 
   /* ---------- shell ---------- */
@@ -761,6 +725,14 @@ textarea {
     });
   }
 
+  /* writes run one after another so quick taps can never land out of order */
+  var wq = Promise.resolve();
+  function queued(fn) {
+    var p = wq.then(fn);
+    wq = p.then(null, function () {});
+    return p;
+  }
+
   function readState() {
     if (demo) {
       return Promise.resolve(Object.assign({ nodir: false }, fake));
@@ -772,8 +744,9 @@ textarea {
       "  if [ -f $D/$f.txt ]; then printf '%s=' $f; cat $D/$f.txt; else printf '%s=\\n' $f; fi; " +
       "done; " +
       "echo -n 'skip='; [ -f $D/skip.txt ] && cat $D/skip.txt | tr '\\n' '|' || true; echo; " +
-      "echo -n 'texg='; [ -f $D/codm_tex.log ] && grep -E '^TEXG ' $D/codm_tex.log | tail -n 40 | tr '\\n' '|' || true; echo; " +
-      "echo -n 'ft='; [ -f $D/codm_tex.log ] && grep -E '^FT ' $D/codm_tex.log | tail -n 1 || true; echo";
+      "echo -n 'texg='; [ -f $D/codm_tex.log ] && grep -E '^TEXG ' $D/codm_tex.log | tail -n 200 | tr '\\n' '|' || true; echo; " +
+      "echo -n 'ft='; [ -f $D/codm_tex.log ] && grep -E '^FT ' $D/codm_tex.log | tail -n 1 || true; echo; " +
+      "echo -n 'ver='; sed -n 's/^version=//p' " + PROP + " 2>/dev/null | head -n 1; echo";
     return sh(cmd).then(function (r) {
       var s = { nodir: false };
       if (r.stdout.indexOf("NODIR") >= 0) {
@@ -799,16 +772,20 @@ textarea {
       parts.push("chmod 666 $D/" + k + ".txt 2>/dev/null");
     });
     var cmd = "D=" + D + "; [ -d $D ] || { echo NODIR; exit 1; }; " + parts.join("; ") + "; echo OK";
-    return sh(cmd).then(function (r) {
-      r.ok = r.stdout.indexOf("OK") >= 0;
-      return r;
+    return queued(function () {
+      return sh(cmd).then(function (r) {
+        r.ok = r.stdout.indexOf("OK") >= 0;
+        return r;
+      });
     });
   }
 
   function save(map, label) {
     return writeFiles(map).then(function (r) {
-      if (r.ok) toast((label || "Settings") + " saved. Tap Apply for CODM.");
-      else toast("Could not save. Is the game folder present?");
+      if (r.ok) {
+        setPend(true);
+        toast((label || "Settings") + " saved. Tap Apply for CODM.");
+      } else toast("Could not save. Is the game folder present?");
       return r;
     });
   }
@@ -818,18 +795,17 @@ textarea {
     ["home", "adv", "tools"].forEach(function (v) {
       $("v-" + v).classList.toggle("active", v === name);
     });
-    Array.prototype.forEach.call(document.querySelectorAll("#nav button"), function (b) {
+    Array.prototype.forEach.call(document.querySelectorAll("#dock .tabs button"), function (b) {
       var on = b.getAttribute("data-v") === name;
       b.classList.toggle("on", on);
       if (on) b.setAttribute("aria-current", "page");
       else b.removeAttribute("aria-current");
     });
     window.scrollTo(0, 0);
+    if (name === "tools") refreshLogStat();
   }
-  Array.prototype.forEach.call(document.querySelectorAll("#nav button"), function (b) {
-    b.addEventListener("click", function () {
-      showView(b.getAttribute("data-v"));
-    });
+  Array.prototype.forEach.call(document.querySelectorAll("#dock .tabs button"), function (b) {
+    b.addEventListener("click", function () { showView(b.getAttribute("data-v")); });
   });
 
   /* lock background scroll while log overlay is open */
@@ -845,18 +821,38 @@ textarea {
     window.scrollTo(0, lockY);
   }
 
+  /* two-tap confirm for buttons that throw something away */
+  function arm(id, txt, fn) {
+    var b = $(id);
+    b.addEventListener("click", function () {
+      if (b.getAttribute("data-arm") === "1") {
+        clearTimeout(b._t);
+        b.removeAttribute("data-arm");
+        b.classList.remove("armed");
+        b.textContent = b.getAttribute("data-t");
+        fn();
+        return;
+      }
+      b.setAttribute("data-t", b.textContent);
+      b.setAttribute("data-arm", "1");
+      b.classList.add("armed");
+      b.textContent = txt;
+      b._t = setTimeout(function () {
+        b.removeAttribute("data-arm");
+        b.classList.remove("armed");
+        b.textContent = b.getAttribute("data-t");
+      }, 3000);
+    });
+  }
+
   /* ---------- UI helpers ---------- */
   function fill(el) {
     var f = (el.value - el.min) / (el.max - el.min);
     el.style.setProperty("--p", (f * 100) + "%");
     if (el.parentNode) el.parentNode.style.setProperty("--f", f);
   }
-  function setSw(id, on) {
-    $(id).setAttribute("aria-checked", on ? "true" : "false");
-  }
-  function getSw(id) {
-    return $(id).getAttribute("aria-checked") === "true";
-  }
+  function setSw(id, on) { $(id).setAttribute("aria-checked", on ? "true" : "false"); }
+  function getSw(id) { return $(id).getAttribute("aria-checked") === "true"; }
   function blkIdx(v) {
     if (v <= 0) return 0;
     var best = 1, d = 1e9, i;
@@ -866,72 +862,224 @@ textarea {
     }
     return best;
   }
-  function fpsIdx(v) {
-    var i = FPS.indexOf(v);
-    return i < 0 ? 0 : i;
+  function onPick(id, fn) {
+    $(id).addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest(".step") : null;
+      if (b) fn(+b.getAttribute("data-v"));
+    });
+  }
+  function chipsHtml(list, cur, label) {
+    var h = "", i;
+    for (i = 0; i < list.length; i++) {
+      h += '<button type="button" class="step" role="radio" data-v="' + list[i] +
+        '" aria-checked="' + (list[i] === cur ? "true" : "false") + '"><b>' + label(list[i]) + "</b></button>";
+    }
+    return h;
+  }
+
+  /* ---------- preview (a procedural sample texture, reduced like mip levels) ---------- */
+  var pvSrc = null, pvCache = {};
+  function pvBuild() {
+    var c = document.createElement("canvas");
+    c.width = c.height = 256;
+    var x = c.getContext("2d"), r = rng(7), i, j, k, px, py;
+    var g = x.createLinearGradient(0, 0, 256, 256);
+    g.addColorStop(0, "#41528f");
+    g.addColorStop(1, "#171d3b");
+    x.fillStyle = g;
+    x.fillRect(0, 0, 256, 256);
+    /* fine speckle: the detail that is lost first */
+    for (i = 0; i < 3200; i++) {
+      x.fillStyle = r() > 0.5 ? "rgba(255,255,255,0.11)" : "rgba(0,0,0,0.2)";
+      x.fillRect((r() * 256) | 0, (r() * 256) | 0, 1, 1);
+    }
+    /* four panels with seams and rivets */
+    var P = [[8, 8], [132, 8], [8, 132], [132, 132]];
+    for (i = 0; i < 4; i++) {
+      px = P[i][0]; py = P[i][1];
+      x.fillStyle = "rgba(8,11,26,0.35)";
+      x.fillRect(px, py, 116, 116);
+      x.strokeStyle = "rgba(8,11,26,0.95)"; x.lineWidth = 2;
+      x.strokeRect(px + 1, py + 1, 114, 114);
+      x.strokeStyle = "rgba(197,208,255,0.22)"; x.lineWidth = 1;
+      x.strokeRect(px + 3.5, py + 3.5, 109, 109);
+      x.fillStyle = "rgba(197,208,255,0.7)";
+      for (j = 0; j < 4; j++) {
+        x.beginPath();
+        x.arc(px + (j % 2 ? 108 : 8), py + (j > 1 ? 108 : 8), 2.2, 0, 6.2832);
+        x.fill();
+      }
+    }
+    /* emblem */
+    x.strokeStyle = "#8fa4ff"; x.lineWidth = 4;
+    x.beginPath(); x.arc(66, 66, 34, 0, 6.2832); x.stroke();
+    x.strokeStyle = "#c5d0ff"; x.lineWidth = 2;
+    x.beginPath(); x.arc(66, 66, 18, 0, 6.2832); x.stroke();
+    x.beginPath(); x.moveTo(66, 24); x.lineTo(66, 108); x.moveTo(24, 66); x.lineTo(108, 66); x.stroke();
+    /* decal lines */
+    var LW = [86, 64, 78, 48, 82, 58, 70];
+    for (k = 0; k < 7; k++) {
+      x.fillStyle = k === 0 ? "#ffd27a" : "rgba(197,208,255,0.8)";
+      x.fillRect(148, 24 + k * 13, k === 0 ? 30 : LW[k], 3);
+    }
+    /* hazard stripes */
+    x.save();
+    x.beginPath(); x.rect(16, 140, 100, 100); x.clip();
+    for (k = -1; k <= 17; k++) {
+      x.fillStyle = k % 2 ? "#ffd27a" : "#1b1f36";
+      x.beginPath();
+      x.moveTo(16 + k * 12, 140);
+      x.lineTo(28 + k * 12, 140);
+      x.lineTo(-72 + k * 12, 240);
+      x.lineTo(-84 + k * 12, 240);
+      x.closePath();
+      x.fill();
+    }
+    x.restore();
+    /* vent grid */
+    for (j = 0; j < 36; j++) {
+      x.fillStyle = "rgba(197,208,255," + (j % 3 ? 0.55 : 0.22) + ")";
+      x.fillRect(146 + (j % 6) * 16, 146 + ((j / 6) | 0) * 16, 10, 10);
+    }
+    return c;
+  }
+  function pvDown(n) {
+    if (n >= 256) return pvSrc;
+    if (pvCache[n]) return pvCache[n];
+    var s = 256, c = pvSrc;
+    while (s > n) {          /* halve step by step, like a mip chain */
+      s >>= 1;
+      var t = document.createElement("canvas");
+      t.width = t.height = s;
+      var x = t.getContext("2d");
+      x.imageSmoothingEnabled = true;
+      x.drawImage(c, 0, 0, s, s);
+      c = t;
+    }
+    pvCache[n] = c;
+    return c;
+  }
+  function pvDraw() {
+    var a = $("pvA"), b = $("pvB");
+    if (!a.getContext) return;
+    if (!pvSrc) {
+      pvSrc = pvBuild();
+      a.getContext("2d").drawImage(pvSrc, 0, 0);
+    }
+    var n = lookMode === 1 ? BLK[strVal]
+      : (lookMode === 2 ? (256 >> strVal) : (lookMode === 3 ? FTGT[strVal] : 256));
+    var bx = b.getContext("2d");
+    bx.clearRect(0, 0, 256, 256);
+    bx.imageSmoothingEnabled = false;
+    bx.drawImage(pvDown(n), 0, 0, 256, 256);
+    var cap = "No look";
+    if (lookMode === 1) cap = "<b>Pixel Blocks</b> · " + BLK[strVal] + " px";
+    else if (lookMode === 2) cap = "<b>Detail Cut</b> · +" + strVal;
+    else if (lookMode === 3) cap = "<b>Flat</b> · +" + strVal;
+    $("pvBc").innerHTML = cap;
+  }
+
+  /* ---------- look + status ---------- */
+  function stepItems(m) {
+    var a = [], i;
+    if (m === 2 || m === 3) {
+      for (i = 1; i <= 4; i++) a.push({ v: i, b: LVN[i], s: "+" + i });
+    } else {
+      for (i = 1; i <= 5; i++) a.push({ v: i, b: BLKN[i], s: BLK[i] + " px" });
+    }
+    return a;
   }
 
   function updateLookUI() {
     Array.prototype.forEach.call($("lookSeg").children, function (b) {
-      b.classList.toggle("on", +b.getAttribute("data-m") === lookMode);
+      b.setAttribute("aria-checked", +b.getAttribute("data-m") === lookMode ? "true" : "false");
     });
 
-    var str = $("str");
+    var items = stepItems(lookMode || 1), h = "", i, it;
+    for (i = 0; i < items.length; i++) {
+      it = items[i];
+      h += '<button type="button" class="step" role="radio" data-v="' + it.v + '" aria-checked="' +
+        (lookMode && it.v === strVal ? "true" : "false") + '"' + (lookMode ? "" : ' tabindex="-1"') +
+        "><b>" + it.b + "</b><small>" + it.s + "</small></button>";
+    }
+    $("steps").style.setProperty("--n", items.length);
+    $("steps").innerHTML = h;
+    $("steps").setAttribute("aria-disabled", lookMode ? "false" : "true");
+
     if (lookMode === 0) {
-      str.disabled = true;
       $("strV").textContent = "—";
       $("strD").textContent = "No look selected. Textures stay original.";
     } else if (lookMode === 1) {
-      str.disabled = false;
-      str.min = 1; str.max = 5; str.step = 1;
-      str.value = Math.max(1, Math.min(5, strVal));
-      var bi = +str.value;
-      $("strV").textContent = BLK[bi] + " px";
-      $("strD").textContent = BLKN[bi] + " — every texture is reduced to about " + BLK[bi] + " pixels across.";
+      $("strV").textContent = BLK[strVal] + " px";
+      $("strD").textContent = BLKN[strVal] + " — every texture is reduced to about " + BLK[strVal] + " pixels across.";
     } else if (lookMode === 2) {
-      str.disabled = false;
-      str.min = 1; str.max = 4; str.step = 1;
-      str.value = Math.max(1, Math.min(4, strVal));
-      var di = +str.value;
-      $("strV").textContent = DCN[di];
-      $("strD").textContent = "Textures are sampled " + di + " mip level" + (di === 1 ? "" : "s") + " smaller. Colors stay the same.";
+      $("strV").textContent = LVN[strVal];
+      $("strD").textContent = "Textures are sampled " + strVal + " mip level" + (strVal === 1 ? "" : "s") + " smaller. Colors stay the same.";
     } else {
-      str.disabled = false;
-      str.min = 1; str.max = 4; str.step = 1;
-      str.value = Math.max(1, Math.min(4, strVal));
-      var fi = +str.value;
-      $("strV").textContent = FLATN[fi];
-      $("strD").textContent = "Experimental. Surfaces become near-solid color. Lighting stays. Start low (+1).";
+      $("strV").textContent = LVN[strVal];
+      $("strD").textContent = "Experimental. Surfaces become near-solid color. Start low (+1).";
     }
-    fill(str);
+    pvDraw();
     updateStatus();
   }
 
   function updateStatus() {
     var sc = parseInt($("scale").value, 10);
-    var f = FPS[parseInt($("fps").value, 10)];
-    var look = "Off";
-    if (lookMode === 1) look = "Blocks " + BLK[Math.max(1, Math.min(5, strVal))] + " px";
-    else if (lookMode === 2) look = "Detail +" + Math.max(1, Math.min(4, strVal));
-    else if (lookMode === 3) look = "Flat +" + Math.max(1, Math.min(4, strVal));
-    $("status").textContent = look + " · scale " + sc + "% · " + (f ? f + " fps cap" : "no fps cap");
+    var look = "Look off";
+    if (lookMode === 1) look = "Pixel Blocks · " + BLK[strVal] + " px";
+    else if (lookMode === 2) look = "Detail Cut +" + strVal;
+    else if (lookMode === 3) look = "Flat +" + strVal;
+    $("status").innerHTML =
+      '<span class="chip' + (lookMode ? " on" : "") + '"><i></i>' + look + "</span>" +
+      '<span class="chip">Scale ' + sc + "%</span>" +
+      '<span class="chip">' + (fpsVal ? fpsVal + " fps cap" : "No fps cap") + "</span>";
   }
 
   function applyLookToFiles() {
     var map = { near: 1, bias: 0, sedge: 1, blk: 0, style: 0, flat: 0 };
-    if (lookMode === 1) {
-      map.blk = BLK[Math.max(1, Math.min(5, strVal))];
-    } else if (lookMode === 2) {
-      map.style = Math.max(1, Math.min(4, strVal));
-    } else if (lookMode === 3) {
-      map.flat = Math.max(1, Math.min(4, strVal));
-    }
+    if (lookMode === 1) map.blk = BLK[strVal];
+    else if (lookMode === 2) map.style = strVal;
+    else if (lookMode === 3) map.flat = strVal;
     return save(map, "Look");
+  }
+
+  function renderFps() {
+    var list = FPS.slice();
+    if (fpsVal > 0 && list.indexOf(fpsVal) < 0) {      /* custom value typed into fps.txt */
+      list.push(fpsVal);
+      list.sort(function (a, b) { return a - b; });
+    }
+    $("fpsBox").innerHTML = chipsHtml(list, fpsVal, function (v) { return v ? v : "Off"; });
+    $("fpsV").textContent = fpsVal ? fpsVal + " fps" : "Off";
+  }
+  function renderMin() {
+    $("minBox").innerHTML = chipsHtml(MINS, minVal, function (v) { return v; });
+    $("minszV").textContent = minVal + " px";
+  }
+  function updateLogDeps() {
+    var f = getSw("fz"), t = getSw("th");
+    $("th").classList.toggle("dim", !f);
+    $("core").classList.toggle("dim", !(f && t));
+  }
+
+  function fmtT(s) {
+    s = Math.round(s);
+    return s >= 60 ? Math.floor(s / 60) + "m " + (s % 60) + "s" : s + "s";
+  }
+  function renderStats(line) {
+    var o = kv(line || ""), has = o.fps !== undefined;
+    $("tFps").textContent = has ? num(o.fps) : "—";
+    $("tAvg").textContent = has ? num(o.avg, 1) : "—";
+    $("tP99").textContent = has ? num(o.p99) : "—";
+    $("tFz").textContent = has && o.fz !== undefined ? o.fz : "—";
+    $("tFzT").className = "tile" + (has && o.fz !== undefined ? (+o.fz > 0 ? " warn" : " ok") : "");
+    $("sstat").textContent = has
+      ? "Last 5-second window" + (o.t ? " · " + fmtT(parseFloat(o.t)) + " into the session" : "")
+      : "No frame data yet. Play a match to fill this in.";
   }
 
   /* ---------- render state ---------- */
   function render(s) {
-    cfg = s;
     var ban = $("banner");
     ban.innerHTML = "";
     function banner(cls, text, btn) {
@@ -951,12 +1099,18 @@ textarea {
     if (demo) {
       banner("warn", "Preview only. Open this page inside SukiSU Ultra (Module → WebUI) to change real settings.");
     }
+    $("ver").hidden = !s.ver;
+    $("ver").textContent = s.ver || "";
+    $("aVer").textContent = s.ver || "—";
     if (s.nodir) {
-      $("status").textContent = "No settings found yet.";
+      $("status").innerHTML = '<span class="chip msg">No settings found yet.</span>';
       banner("bad", "The game folder is missing. Open CODM once with mode.txt set to 4, then reopen this page.");
       return;
     }
     if (s.err) banner("bad", "Could not read settings: " + s.err);
+    var modeOk = demo || s.mode === "4";
+    $("aMode").textContent = demo ? "4 · demo" : (s.mode === "4" ? "4 · ready" : (s.mode || "empty") + " · needs 4");
+    $("aMode").className = modeOk ? "ok" : "warn";
     if (!demo && s.mode !== undefined && s.mode !== "4") {
       banner("warn", "mode.txt is " + (s.mode || "empty") + ". It must be 4 for the module to work.", {
         label: "Set to 4",
@@ -981,30 +1135,28 @@ textarea {
       lookMode = 0;
       strVal = 3;
     }
-    updateLookUI();
 
     /* display */
     var sc = parseInt(s.scale, 10) || 0;
-    $("scale").value = sc >= 40 && sc <= 99 ? sc : 100;
+    $("scale").value = sc >= 20 && sc <= 99 ? Math.max(40, sc) : 100;
     $("scaleV").textContent = $("scale").value + "%";
     fill($("scale"));
 
-    var f = parseInt(s.fps, 10) || 0;
-    $("fps").value = fpsIdx(f);
-    $("fpsV").textContent = f ? FPS[$("fps").value] : "Off";
-    fill($("fps"));
+    fpsVal = parseInt(s.fps, 10) || 0;
+    if (fpsVal < 20 || fpsVal > 120) fpsVal = 0;     /* same range the module accepts */
+    renderFps();
 
     setSw("fz", s.fz !== "0");
     setSw("th", s.th !== "0");
     setSw("core", s.core !== "0");
+    updateLogDeps();
 
     var ms = parseInt(s.minsz, 10) || 64, mi = 0;
     MINS.forEach(function (v, i) {
       if (Math.abs(v - ms) < Math.abs(MINS[mi] - ms)) mi = i;
     });
-    $("minsz").value = mi;
-    $("minszV").textContent = MINS[mi] + " px";
-    fill($("minsz"));
+    minVal = MINS[mi];
+    renderMin();
 
     var di = Math.max(0, Math.min(12, Math.round((parseInt(s.delay, 10) || 0) / 5)));
     $("delay").value = di;
@@ -1017,18 +1169,11 @@ textarea {
 
     parseGroups(s.skip || "", s.texg || "");
     renderGroups();
-    updateStatus();
-
-    var m = /fps=([\d.]+)/.exec(s.ft || "");
-    var z = /fz=(\d+)/.exec(s.ft || "");
-    $("stat").textContent = m
-      ? ("Last window: " + Math.round(parseFloat(m[1])) + " fps" +
-         (z ? ", " + z[1] + " freeze" + (z[1] === "1" ? "" : "s") : ""))
-      : "No frame data yet.";
+    updateLookUI();
+    renderStats(s.ft);
   }
 
   /* ---------- texture groups ---------- */
-  var groups = [], skipSet = {}, extraSkip = [];
   function fmtName(f) {
     var e = {
       0x9270: "R11 EAC", 0x9271: "R11 EAC signed", 0x9272: "RG11 EAC", 0x9273: "RG11 EAC signed",
@@ -1054,7 +1199,7 @@ textarea {
       if (m[2] === "0") extraSkip.push(l.trim());
       else skipSet[m[1] + "|" + m[2]] = 1;
     });
-    texgText.split("\n").forEach(function (l) {
+    texgText.split("\n").forEach(function (l) {   /* later (newer) lines overwrite earlier ones */
       m = re.exec(l);
       if (!m) return;
       map[m[1] + "|" + m[2]] = { fmt: +m[1], sz: +m[2], n: +m[3], ap: +m[4] };
@@ -1068,67 +1213,66 @@ textarea {
     groups = Object.keys(map).map(function (k) { return map[k]; });
     groups.sort(function (a, b) { return b.sz - a.sz || b.n - a.n; });
   }
-  function writeSkip() {
+  function skipLines() {
     var lines = extraSkip.slice();
-    Object.keys(skipSet).forEach(function (k) {
-      lines.push(k.replace("|", " "));
-    });
+    Object.keys(skipSet).forEach(function (k) { lines.push(k.replace("|", " ")); });
+    return lines;
+  }
+  function writeSkip() {
+    var lines = skipLines();
     if (demo) return Promise.resolve({ ok: true });
     var cmd = "D=" + D + "; [ -d $D ] || { echo NODIR; exit 1; }; ";
     cmd += lines.length
       ? ("printf '%s\\n' " + lines.map(function (l) { return '"' + l + '"'; }).join(" ") + " > $D/skip.txt; ")
       : ": > $D/skip.txt; ";
     cmd += "chmod 666 $D/skip.txt 2>/dev/null; echo OK";
-    return sh(cmd).then(function (r) {
-      r.ok = r.stdout.indexOf("OK") >= 0;
-      return r;
+    return queued(function () {
+      return sh(cmd).then(function (r) {
+        r.ok = r.stdout.indexOf("OK") >= 0;
+        return r;
+      });
     });
   }
-  function syncSkipText() {
-    var lines = extraSkip.slice();
-    Object.keys(skipSet).forEach(function (k) {
-      lines.push(k.replace("|", " "));
-    });
-    $("skipt").value = lines.join("\n");
+  function syncSkipText() { $("skipt").value = skipLines().join("\n"); }
+  function skipDone(r) {
+    if (r.ok) setPend(true);
+    toast(r.ok ? "List saved. Tap Apply for CODM." : "Could not save the list.");
   }
   function renderGroups() {
     syncSkipText();
-    var box = $("groups");
-    box.innerHTML = "";
+    var box = $("groups"), cnt = $("gcount");
     if (!groups.length) {
-      var p = document.createElement("p");
-      p.className = "desc";
-      p.textContent = "No groups yet. Play a match with the logs on, then tap Refresh list.";
-      box.appendChild(p);
+      cnt.hidden = true;
+      box.innerHTML = '<p class="desc">No groups yet. Play a match with the logs on, then tap Refresh list.</p>';
       return;
     }
+    var h = "", off = 0;
     groups.forEach(function (g) {
-      var key = g.fmt + "|" + g.sz;
-      var b = document.createElement("button");
-      b.className = "sw";
-      b.type = "button";
-      b.setAttribute("role", "switch");
-      b.setAttribute("aria-checked", skipSet[key] ? "false" : "true");
-      b.innerHTML = '<span><span class="t"></span><span class="d"></span></span><span class="knob"></span>';
-      b.querySelector(".t").textContent = fmtName(g.fmt) + ", " + g.sz + " px";
-      b.querySelector(".d").textContent = g.n
-        ? (g.n + " texture" + (g.n === 1 ? "" : "s") + " seen")
-        : "Not seen in the current log";
-      b.addEventListener("click", function () {
-        if (skipSet[key]) delete skipSet[key];
-        else skipSet[key] = 1;
-        b.setAttribute("aria-checked", skipSet[key] ? "false" : "true");
-        syncSkipText();
-        writeSkip().then(function (r) {
-          toast(r.ok ? "List saved. Tap Apply for CODM." : "Could not save the list.");
-        });
-      });
-      box.appendChild(b);
+      var key = g.fmt + "|" + g.sz, sk = !!skipSet[key];
+      if (sk) off++;
+      h += '<button class="sw" type="button" role="switch" data-k="' + key + '" aria-checked="' + (sk ? "false" : "true") + '">' +
+        '<span><span class="t">' + esc(fmtName(g.fmt)) + ", " + g.sz + ' px</span><span class="d">' +
+        (g.n ? g.n + " seen · " + g.ap + " changed" : "Not seen in the current log") +
+        '</span></span><span class="knob"></span></button>';
     });
+    box.innerHTML = h;
+    cnt.hidden = false;
+    cnt.textContent = groups.length + " group" + (groups.length === 1 ? "" : "s") + (off ? " · " + off + " off" : "");
   }
-  function refresh() {
-    return readState().then(render);
-  }
+  $("groups").addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest(".sw") : null;
+    if (!b) return;
+    var key = b.getAttribute("data-k");
+    if (skipSet[key]) delete skipSet[key];
+    else skipSet[key] = 1;
+    b.setAttribute("aria-checked", skipSet[key] ? "false" : "true");
+    syncSkipText();
+    var off = Object.keys(skipSet).length;
+    $("gcount").textContent = groups.length + " group" + (groups.length === 1 ? "" : "s") + (off ? " · " + off + " off" : "");
+    writeSkip().then(skipDone);
+  });
+
+  function refresh() { return readState().then(render); }
 
   /* ---------- events ---------- */
   Array.prototype.forEach.call($("lookSeg").children, function (b) {
@@ -1140,13 +1284,10 @@ textarea {
       applyLookToFiles();
     });
   });
-
-  $("str").addEventListener("input", function () {
-    strVal = parseInt($("str").value, 10);
+  onPick("steps", function (v) {
+    if (!lookMode) return;
+    strVal = v;
     updateLookUI();
-  });
-  $("str").addEventListener("change", function () {
-    strVal = parseInt($("str").value, 10);
     applyLookToFiles();
   });
 
@@ -1160,22 +1301,16 @@ textarea {
     save({ scale: v >= 100 ? 0 : v }, "Render scale");
   });
 
-  $("fps").addEventListener("input", function () {
-    var f = FPS[parseInt($("fps").value, 10)];
-    $("fpsV").textContent = f ? f : "Off";
-    fill($("fps"));
+  onPick("fpsBox", function (v) {
+    fpsVal = v;
+    renderFps();
     updateStatus();
+    save({ fps: v }, "Frame rate cap");
   });
-  $("fps").addEventListener("change", function () {
-    save({ fps: FPS[parseInt($("fps").value, 10)] }, "Frame rate cap");
-  });
-
-  $("minsz").addEventListener("input", function () {
-    $("minszV").textContent = MINS[parseInt($("minsz").value, 10)] + " px";
-    fill($("minsz"));
-  });
-  $("minsz").addEventListener("change", function () {
-    save({ minsz: MINS[parseInt($("minsz").value, 10)] }, "Smallest texture");
+  onPick("minBox", function (v) {
+    minVal = v;
+    renderMin();
+    save({ minsz: v }, "Smallest texture");
   });
 
   $("delay").addEventListener("input", function () {
@@ -1204,6 +1339,7 @@ textarea {
     });
     writeSkip().then(function (r) {
       renderGroups();
+      if (r.ok) setPend(true);
       toast(r.ok
         ? ("Saved " + ok.length + " line" + (ok.length === 1 ? "" : "s") +
            (bad ? ", ignored " + bad : "") + ". Tap Apply for CODM.")
@@ -1216,12 +1352,16 @@ textarea {
   $("gref").addEventListener("click", function () {
     refresh().then(function () { toast("Groups refreshed."); });
   });
+  $("sref").addEventListener("click", function () {
+    refresh().then(function () { toast("Stats refreshed."); });
+  });
   $("gall").addEventListener("click", function () {
     skipSet = {};
     extraSkip = [];
     writeSkip().then(function (r) {
       renderGroups();
-      toast(r.ok ? "All groups on. Tap Apply for CODM." : "Could not save the list.");
+      skipDone(r);
+      if (r.ok) toast("All groups on. Tap Apply for CODM.");
     });
   });
 
@@ -1230,6 +1370,7 @@ textarea {
       var on = !getSw(k);
       var m = {};
       setSw(k, on);
+      updateLogDeps();
       m[k] = on ? 1 : 0;
       save(m, k === "fz" ? "Freeze log" : (k === "th" ? "Thread log" : "Core log"));
     });
@@ -1237,17 +1378,89 @@ textarea {
 
   $("stop").addEventListener("click", function () {
     sh("am force-stop " + PKG).then(function (r) {
+      if (demo || r.errno === 0) setPend(false);
       toast(demo
         ? "Demo mode — nothing was stopped."
         : (r.errno === 0 ? "CODM stopped. Open it again to apply." : "Could not stop CODM."));
     });
   });
-  $("clr").addEventListener("click", function () {
+
+  function fmtBytes(n) {
+    n = +n || 0;
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / (1024 * 1024)).toFixed(2) + " MB";
+  }
+
+  function refreshLogStat() {
+    var el = $("logStat");
+    if (!el) return;
+    if (demo) {
+      el.innerHTML = '<span class="warn">Demo mode</span> — log status is only available inside SukiSU.';
+      return;
+    }
+    el.textContent = "Checking…";
+    var cmd =
+      "L=" + D + "/codm_tex.log; " +
+      "E='/sdcard/CODM Log/codm_tex.log'; " +
+      "echo '---LIVE---'; " +
+      "if [ -f \"$L\" ]; then " +
+      "  echo PRESENT; " +
+      "  wc -c < \"$L\"; " +
+      "  wc -l < \"$L\"; " +
+      "  date -r \"$L\" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || stat -c '%y' \"$L\" 2>/dev/null | cut -c1-19; " +
+      "  grep -E '^=== start' \"$L\" 2>/dev/null | tail -n 1; " +
+      "else echo MISSING; fi; " +
+      "echo '---EXPORT---'; " +
+      "if [ -f \"$E\" ]; then " +
+      "  echo PRESENT; " +
+      "  wc -c < \"$E\"; " +
+      "  date -r \"$E\" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || stat -c '%y' \"$E\" 2>/dev/null | cut -c1-19; " +
+      "else echo MISSING; fi";
+    sh(cmd).then(function (r) {
+      var out = (r.stdout || "").trim();
+      if (!out) {
+        el.innerHTML = '<span class="bad">Could not read log status.</span>';
+        return;
+      }
+      var parts = out.split("---EXPORT---");
+      var livePart = (parts[0] || "").replace("---LIVE---", "").trim();
+      var expPart = (parts[1] || "").trim();
+      var ll = livePart.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      var exp = expPart.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      var html = "";
+      if (ll[0] === "MISSING" || !ll.length) {
+        html += '<div><span class="warn">Live log:</span> <b>cleared / none</b></div>';
+      } else {
+        var startLine = ll.slice(4).join(" ") || "";
+        html += '<div><span class="ok">Live log:</span> <b>' + fmtBytes(ll[1] || "0") + "</b> · " + (ll[2] || "?") + " lines</div>";
+        html += "<div>Updated: " + esc(ll[3] || "?") + "</div>";
+        if (startLine) html += '<div class="startline">' + esc(startLine) + "</div>";
+      }
+      if (exp[0] === "MISSING" || !exp[0]) {
+        html += '<div class="expgap"><span class="warn">Exported:</span> <b>not yet</b></div>';
+      } else {
+        html += '<div class="expgap"><span class="ok">Exported:</span> <b>' + fmtBytes(exp[1] || 0) + "</b></div>";
+        if (exp[2]) html += "<div>Export time: " + esc(exp[2]) + "</div>";
+        if (ll[0] !== "MISSING" && ll[1] && exp[1] && +exp[1] > 0) {
+          var diff = Math.abs(+ll[1] - +exp[1]);
+          if (diff < 64) html += '<div class="ok">Export matches live size.</div>';
+          else if (+exp[1] < +ll[1]) html += '<div class="warn">Live log is newer / larger than last export.</div>';
+        }
+      }
+      el.innerHTML = html;
+    });
+  }
+
+  arm("clr", "Tap again to clear", function () {
     sh("rm -f " + D + "/codm_tex.log").then(function (r) {
       toast(demo ? "Demo mode — nothing deleted." : (r.errno === 0 ? "Log cleared." : "Could not clear the log."));
-      refresh();
+      refreshLogStat();
     });
   });
+
+  $("logref").addEventListener("click", function () { refreshLogStat(); });
+
   $("vlog").addEventListener("click", function () {
     $("logt").textContent = "Loading…";
     $("logw").classList.add("open");
@@ -1265,7 +1478,7 @@ textarea {
     $("logw").classList.remove("open");
     unlockScroll();
   });
-  $("reset").addEventListener("click", function () {
+  arm("reset", "Tap again to reset", function () {
     save(REC, "Defaults").then(function () {
       skipSet = {};
       extraSkip = [];
@@ -1331,10 +1544,16 @@ textarea {
         var n = parseInt(r.stdout.split("OK")[1], 10) || 0;
         toast("Exported " + Math.max(1, Math.round(n / 1024)) + " KB to CODM Log/codm_tex.log");
       } else toast("Could not export the log.");
+      refreshLogStat();
     });
   });
 
+  /* first paint with defaults, then read the real state */
+  updateLookUI();
+  renderFps();
+  renderMin();
   refresh();
+  refreshLogStat();
 })();
 </script>
 </body>
