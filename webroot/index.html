@@ -428,11 +428,6 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
         <p class="desc" id="ttsmD"></p>
         <div class="steps" id="ttsmBox" role="radiogroup" aria-labelledby="ttsmL" style="--n:2"></div>
       </div>
-      <div class="row" id="ttAxRow" style="display:none">
-        <div class="rh"><span class="lb" id="ttaxL">Anisotropy</span><span class="val" id="ttaxV">Off</span></div>
-        <p class="desc" id="ttaxD"></p>
-        <div class="steps" id="ttaxBox" role="radiogroup" aria-labelledby="ttaxL" style="--n:2"></div>
-      </div>
     </section>
 
     <section class="card">
@@ -625,32 +620,28 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   var REC = {
     blk: 0, bias: 0, near: 1, scale: 0, fps: 0,
     fz: 1, th: 1, core: 1, mode: 4,
-    minsz: 64, delay: 0, style: 0, sedge: 1, flat: 0, testtex: 0, ttsize: 0, ttsm: 0, ttaniso: 0
+    minsz: 64, delay: 0, style: 0, sedge: 1, flat: 0, testtex: 0, ttsize: 0, ttsm: 0
   };
 
   var demo = (typeof ksu === "undefined");
   var fake = {
     blk: "0", bias: "0", near: "1", scale: "0", fps: "0",
     fz: "1", th: "1", core: "1", mode: "4",
-    minsz: "64", delay: "0", style: "0", sedge: "1", flat: "0", testtex: "0", ttsize: "0", ttsm: "0", ttaniso: "0",
-    skip: "", ver: "v0.23",
+    minsz: "64", delay: "0", style: "0", sedge: "1", flat: "0", testtex: "0", ttsize: "0", ttsm: "0",
+    skip: "", ver: "v0.24",
     texg: "TEXG t=60 fmt=37812 hex=0x93b4 sz=1024 n=40 ap=40\nTEXG t=60 fmt=37812 hex=0x93b4 sz=2048 n=6 ap=6\nTEXG t=60 fmt=37815 hex=0x93b7 sz=512 n=120 ap=120\nTEXG t=60 fmt=37496 hex=0x9278 sz=256 n=64 ap=60\nTEXG t=60 fmt=37497 hex=0x9279 sz=512 n=12 ap=0",
     ft: "FT fps=55.2 avg=18.1ms p50=17.6 p99=41.3 max=63.0 >33ms=3 >50ms=1 n=276 cap=0 bias=0 scale=100 t=125.0 fz=1"
   };
   var seq = 0;
-  var TTSZ = [-1, 0, 1, 2, 3, 4];
-  var TTSZN = { "-1": "Finer", "0": "Normal", "1": "Bigger", "2": "Big", "3": "Huge", "4": "Max" };
-  var TTSZD = { "-1": "Smallest pixels (native size, no mip). Can shimmer far away.",
+  var TTSZ = [-2, -1, 0, 1, 2, 3];
+  var TTSZN = { "-2": "Finer", "-1": "Fine", "0": "Normal", "1": "Big", "2": "Bigger", "3": "Huge" };
+  var TTSZD = { "-2": "Smallest pixels (native size, no mip). Shimmers far away.",
+    "-1": "Small pixels, far surfaces stay finer than Normal. Little shimmer.",
     "0": "Native texture pixels, the GPU picks the mip.",
     "1": "Pixels about 2x bigger.", "2": "Pixels about 4x bigger.",
-    "3": "Pixels about 8x bigger.", "4": "Pixels about 16x bigger (small textures are capped)." };
+    "3": "Pixels about 8x bigger (small textures are capped)." };
   var TTSM = [0, 1];
   var TTSMN = ["Sharp", "Soft"];
-  var TTAX = [0, 1];
-  var TTAXN = ["Off", "Game"];
-  var TTAXD = ["Anisotropy forced off (default).",
-    "Keeps the game's anisotropic filtering. May reduce streaks on walls and floors seen at an angle."];
-  var ttAx = 0;
   var TTSMD = ["Hard square pixels.", "Softens the jump between mip levels. Pixels stay square."];
   var ttSize = 0, ttSm = 0;
   var lookMode = 0;   /* 0=Off  1=Pixel Blocks  2=Detail Cut  3=Flat  4=Test Tex */
@@ -774,7 +765,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     var cmd =
       "D=" + D + "; " +
       "[ -d $D ] || { echo NODIR; exit 0; }; " +
-      "for f in bias scale fps fz th core near blk minsz delay style sedge flat testtex ttsize ttsm ttaniso mode; do " +
+      "for f in bias scale fps fz th core near blk minsz delay style sedge flat testtex ttsize ttsm mode; do " +
       "  if [ -f $D/$f.txt ]; then printf '%s=' $f; cat $D/$f.txt; else printf '%s=\\n' $f; fi; " +
       "done; " +
       "echo -n 'skip='; [ -f $D/skip.txt ] && cat $D/skip.txt | tr '\\n' '|' || true; echo; " +
@@ -1030,7 +1021,6 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     var on = lookMode === 4;
     $("ttSzRow").style.display = on ? "" : "none";
     $("ttSmRow").style.display = on ? "" : "none";
-    $("ttAxRow").style.display = on ? "" : "none";
     $("strRow").style.display = on ? "none" : "";
     $("ttszBox").innerHTML = chipsHtml(TTSZ, ttSize, function (v) { return TTSZN[v]; });
     $("ttszV").textContent = TTSZN[ttSize];
@@ -1038,9 +1028,6 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     $("ttsmBox").innerHTML = chipsHtml(TTSM, ttSm, function (v) { return TTSMN[v]; });
     $("ttsmV").textContent = TTSMN[ttSm];
     $("ttsmD").textContent = TTSMD[ttSm];
-    $("ttaxBox").innerHTML = chipsHtml(TTAX, ttAx, function (v) { return TTAXN[v]; });
-    $("ttaxV").textContent = TTAXN[ttAx];
-    $("ttaxD").textContent = TTAXD[ttAx];
   }
 
   function updateLookUI() {
@@ -1184,9 +1171,8 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     var blk = parseInt(s.blk, 10) || 0;
     var flt = parseInt(s.flat, 10) || 0;
     var ttx = parseInt(s.testtex, 10) || 0;
-    ttSize = Math.max(-1, Math.min(4, parseInt(s.ttsize, 10) || 0));
+    ttSize = Math.max(-2, Math.min(3, parseInt(s.ttsize, 10) || 0));
     ttSm = Math.max(0, Math.min(1, parseInt(s.ttsm, 10) || 0));
-    ttAx = parseInt(s.ttaniso, 10) ? 1 : 0;
     if (ttx > 0) {
       lookMode = 4;
       strVal = 1;
@@ -1382,10 +1368,6 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   onPick("ttsmBox", function (v) {
     ttSm = v; renderTT();
     save({ ttsm: v }, "Edge blend");
-  });
-  onPick("ttaxBox", function (v) {
-    ttAx = v; renderTT();
-    save({ ttaniso: v }, "Anisotropy");
   });
   onPick("minBox", function (v) {
     minVal = v;
