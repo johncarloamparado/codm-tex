@@ -50,6 +50,7 @@
 #define STYF DIR "style.txt"
 #define SEDF DIR "sedge.txt"
 #define FLATF DIR "flat.txt"
+#define TTEXF DIR "testtex.txt"
 
 static std::mutex mu;
 static FILE *lf = nullptr;
@@ -113,18 +114,28 @@ static void h_del(GLsizei n, const GLuint *ids) {
 static std::atomic<int> g_style{0};
 static std::atomic<int> g_sedge{1};
 static std::atomic<int> g_flat{0};
+static std::atomic<int> g_testtex{0};  /* testtex.txt: 0 off | 1 = Test Tex (NEAREST only, full mips) */
 #define TEX_MIN_LOD 0x813A
 #define TEX_MAX_LEVEL 0x813D
 #define TEX_ANISO 0x84FE
+#ifndef GL_NEAREST_MIPMAP_NEAREST
+#define GL_NEAREST_MIPMAP_NEAREST 0x2700
+#endif
 
 static void h_tp(GLenum t, GLenum p, GLint v) {
     int st = g_style.load();
     int fl = g_flat.load();
-    if ((st > 0 || fl > 0) && p == TEX_ANISO && v > 1) v = 1;
+    int tt = g_testtex.load();
+    if ((st > 0 || fl > 0 || tt > 0) && p == TEX_ANISO && v > 1) v = 1;
     if (t == GL_TEXTURE_2D && (p == GL_TEXTURE_MIN_FILTER || p == GL_TEXTURE_MAG_FILTER)) {
         GLuint id = tl_bound[tl_unit];
         if (id > 0 && id < MAXTEX && g_tf[id].load()) {
-            if (fl > 0) {
+            if (tt > 0) {
+                /* Test Tex: sharp texels, keep full resolution mips */
+                if (p == GL_TEXTURE_MAG_FILTER) v = GL_NEAREST;
+                else v = GL_NEAREST_MIPMAP_NEAREST;
+                g_forced++;
+            } else if (fl > 0) {
                 /* Flat: both filters NEAREST so the tiny mip stays solid */
                 v = GL_NEAREST;
                 g_forced++;
@@ -142,7 +153,7 @@ static void h_tp(GLenum t, GLenum p, GLint v) {
 
 static void (*o_tpf)(GLenum, GLenum, GLfloat) = nullptr;
 static void h_tpf(GLenum t, GLenum p, GLfloat v) {
-    if ((g_style.load() > 0 || g_flat.load() > 0) && p == TEX_ANISO && v > 1.0f) v = 1.0f;
+    if ((g_style.load() > 0 || g_flat.load() > 0 || g_testtex.load() > 0) && p == TEX_ANISO && v > 1.0f) v = 1.0f;
     if (o_tpf) o_tpf(t, p, v);
 }
 
@@ -216,6 +227,24 @@ static void h_st(GLenum t, GLsizei lv, GLenum fmt, GLsizei w, GLsizei h) {
     bool skip = in_skip((int)fmt, (int)w, (int)h) || mx < g_minsz.load();
     int dl = g_delay.load();
     if (!skip && dl > 0 && now_ns() - g_tstart.load() < (int64_t)dl * 1000000000LL) skip = true;
+
+    /* Test Tex: force NEAREST sampling only — full texture data, sharp pixel look. */
+    int tt = g_testtex.load();
+    if (tt > 0) {
+        grp_note((int)fmt, mx, !skip);
+        if (!skip && real_tp) {
+            GLuint id = tl_bound[tl_unit];
+            if (id > 0 && id < MAXTEX) {
+                g_tf[id] = 1; g_flagged++;
+                real_tp(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+                real_tp(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            }
+            int n = ++g_applied;
+            if (n <= 100 || n % 500 == 0)
+                L("TESTTEX #%d %dx%d lv=%d fmt=0x%x\n", n, w, h, lv, fmt);
+        }
+        return;
+    }
 
     /* v19 Flat Color: lock to tiny mips so the surface is near-solid color (lighting still applies). */
     int fl = g_flat.load();
@@ -755,9 +784,9 @@ static int32_t h_sbg(ANativeWindow *w, int32_t ww, int32_t hh, int32_t f) {
 
 static void *wrap(const char *n, void *r) {
     if (!n || !r) return r;
-    if (!strcmp(n, "glTexParameteri")) { if (!real_tp) real_tp = (decltype(real_tp))r; return (g_near.load() || g_style.load() || g_flat.load()) ? (void *)h_tp : r; }
-    if (!strcmp(n, "glTexParameterf")) { if (!o_tpf) o_tpf = (decltype(o_tpf))r; return (g_style.load() || g_flat.load()) ? (void *)h_tpf : r; }
-    if (g_near.load() || g_style.load() || g_flat.load()) {
+    if (!strcmp(n, "glTexParameteri")) { if (!real_tp) real_tp = (decltype(real_tp))r; return (g_near.load() || g_style.load() || g_flat.load() || g_testtex.load()) ? (void *)h_tp : r; }
+    if (!strcmp(n, "glTexParameterf")) { if (!o_tpf) o_tpf = (decltype(o_tpf))r; return (g_style.load() || g_flat.load() || g_testtex.load()) ? (void *)h_tpf : r; }
+    if (g_near.load() || g_style.load() || g_flat.load() || g_testtex.load()) {
         if (!strcmp(n, "glActiveTexture")) { if (!o_act) o_act = (decltype(o_act))r; return (void *)h_act; }
         if (!strcmp(n, "glBindTexture")) { if (!o_bind) o_bind = (decltype(o_bind))r; return (void *)h_bind; }
         if (!strcmp(n, "glDeleteTextures")) { if (!o_del) o_del = (decltype(o_del))r; return (void *)h_del; }
@@ -913,6 +942,15 @@ static void load_cfg() {
         f = fopen(FLATF, "w");
         if (f) { fprintf(f, "0\n"); fclose(f); }
     }
+    f = fopen(TTEXF, "r");
+    if (f) {
+        int v = 0;
+        if (fscanf(f, "%d", &v) == 1) g_testtex = v ? 1 : 0;
+        fclose(f);
+    } else {
+        f = fopen(TTEXF, "w");
+        if (f) { fprintf(f, "0\n"); fclose(f); }
+    }
     g_tstart = now_ns();
     f = fopen(COREF, "r");
     if (f) {
@@ -944,8 +982,8 @@ static void reg_hooks(dev_t dv, ino_t in) {
     lsplt::RegisterHook(dv, in, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
     lsplt::RegisterHook(dv, in, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
     lsplt::RegisterHook(dv, in, "glTexStorage2D", (void *)h_st, (void **)&o_st);
-    if (g_style.load() || g_flat.load()) lsplt::RegisterHook(dv, in, "glTexParameterf", (void *)h_tpf, (void **)&o_tpf);
-    if (g_near.load() || g_style.load() || g_flat.load()) {
+    if (g_style.load() || g_flat.load() || g_testtex.load()) lsplt::RegisterHook(dv, in, "glTexParameterf", (void *)h_tpf, (void **)&o_tpf);
+    if (g_near.load() || g_style.load() || g_flat.load() || g_testtex.load()) {
         lsplt::RegisterHook(dv, in, "glTexParameteri", (void *)h_tp, (void **)&real_tp);
         lsplt::RegisterHook(dv, in, "glActiveTexture", (void *)h_act, (void **)&o_act);
         lsplt::RegisterHook(dv, in, "glBindTexture", (void *)h_bind, (void **)&o_bind);
@@ -1015,7 +1053,7 @@ static void run(int mode) {
     load_cfg();
     std::set<std::pair<dev_t, ino_t>> done;
     std::map<std::pair<dev_t, ino_t>, int64_t> first;   /* when libunity was first seen */
-    L("=== start v20 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d flat=%d builtin=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load(), g_flat.load(), (int)(sizeof g_builtin / sizeof g_builtin[0]));
+    L("=== start v21 mode=%d bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d flat=%d testtex=%d builtin=%d ===\n", mode, g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load(), g_flat.load(), g_testtex.load(), (int)(sizeof g_builtin / sizeof g_builtin[0]));
     int total = (mode == 1) ? 60 : 1200;
     for (int i = 0; i < total; i++) {
         if (mode >= 2) {
@@ -1058,7 +1096,7 @@ public:
         int mode = read_mode();
         if (mode == 4) {
             load_cfg();
-            L("=== start v20 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d flat=%d builtin=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load(), g_flat.load(), (int)(sizeof g_builtin / sizeof g_builtin[0]));
+            L("=== start v21 mode=4 bias=%d fpscap=%d scale=%d fz=%d th=%d core=%d near=%d blk=%d min=%d delay=%d skip=%d style=%d sedge=%d flat=%d testtex=%d builtin=%d ===\n", g_bias.load(), g_fps.load(), g_scale.load(), g_fz.load(), g_th.load(), g_core.load(), g_near.load(), g_blk.load(), g_minsz.load(), g_delay.load(), (int)g_skip.size(), g_style.load(), g_sedge.load(), g_flat.load(), g_testtex.load(), (int)(sizeof g_builtin / sizeof g_builtin[0]));
             hook_nativeloader();
             return;
         }
