@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- CODM Blocky Textures: WebUI for SukiSU Ultra / KernelSU. Reads and writes the module's settings files via ksu.exec. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -46,7 +47,7 @@ body {
 }
 body.lock { overflow: hidden; position: fixed; left: 0; right: 0; width: 100%; }
 
-/* Sleek Background Gradient */
+/* Background gradient */
 #bg-glow {
   position: fixed; top: -20%; left: -10%; width: 120%; height: 120%; z-index: -2;
   background: radial-gradient(circle at 50% 0%, rgba(129, 140, 248, 0.15), transparent 60%),
@@ -249,7 +250,7 @@ textarea {
 }
 textarea:focus { outline: none; border-color: var(--primary); }
 
-/* ---------- Skip Manager UI ---------- */
+/* ---------- skip manager ---------- */
 .skip-input-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .skip-list { display: flex; flex-direction: column; gap: 8px; }
 .skip-item {
@@ -572,7 +573,7 @@ body.pend .apply::after { display: block; animation: pulse 1.5s ease-in-out infi
           </div>
           
           <div class="skip-list" id="skipList">
-            <!-- Skip items rendered here -->
+            <!-- rows are rendered by renderSkipList() -->
           </div>
           
           <p class="pnote">Built-in rules protect scopes and character detail. Switch one off or delete it to let those textures be changed. Reset defaults restores them.</p>
@@ -697,7 +698,7 @@ body.pend .apply::after { display: block; animation: pulse 1.5s ease-in-out infi
   var FPS = [0, 30, 40, 45, 60, 72, 90, 120];
   var MINS = [64, 128, 256, 512, 1024, 2048];
 
-  /* defaults written by Reset */
+  /* values written by "Reset defaults" */
   var REC = {
     blk: 0, bias: 0, near: 1, scale: 0, fps: 0,
     fz: 1, th: 1, core: 1, mode: 4,
@@ -739,7 +740,7 @@ body.pend .apply::after { display: block; animation: pulse 1.5s ease-in-out infi
   var strVal = 3;     /* 1-5 for blocks, 1-4 for detail cut / flat */
   var fpsVal = 0, minVal = 64;
   
-  /* Skip Manager State */
+  /* skip manager state */
   var groups = [], skipSet = {};
   var customSkips = [];
   var blOff = {}, blDel = {};
@@ -1756,7 +1757,7 @@ body.pend .apply::after { display: block; animation: pulse 1.5s ease-in-out infi
     });
   });
 
-  /* first paint with defaults, then read the real state */
+  /* paint once with defaults, then load the real settings */
   updateLookUI();
   renderFps();
   renderMin();
