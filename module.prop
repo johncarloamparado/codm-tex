@@ -1,6 +1,6 @@
 id=codm_tex_logger
 name=CODM Blocky Textures
-version=v0.22
-versionCode=23
+version=v0.23
+versionCode=24
 author=Q9 Papyrus
 description=Pixel Blocks, Detail Cut, Flat, and Test Tex (true pixel) looks for CODM, with WebUI and frame logger.
