@@ -4,26 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#06070c">
+<meta name="theme-color" content="#09090b">
 <title>CODM Blocky Textures</title>
 <style>
 :root {
-  --bg: #06070c;
-  --card-a: rgba(25, 29, 52, 0.88);
-  --card-b: rgba(15, 18, 32, 0.88);
-  --fill: rgba(255, 255, 255, 0.05);
-  --line: rgba(255, 255, 255, 0.09);
-  --text: #eef1ff;
-  --mute: #8b93b0;
-  --accent: #8fa4ff;
-  --accent2: #c5d0ff;
-  --violet: #b69cff;
-  --ink: #0a0e1c;
-  --warn: #ffd27a;
-  --bad: #ff8f88;
-  --ok: #7de2a8;
+  --bg: #09090b;
+  --card: rgba(24, 24, 27, 0.65);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --fill: rgba(255, 255, 255, 0.04);
+  --fill-hover: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.1);
+  --text: #f4f4f5;
+  --mute: #a1a1aa;
+  --primary: #818cf8;
+  --primary-glow: rgba(129, 140, 248, 0.25);
+  --accent: #c084fc;
+  --ink: #09090b;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --ok: #34d399;
   --track: rgba(255, 255, 255, 0.12);
-  --dock-h: 62px;
+  --dock-h: 68px;
   box-sizing: border-box;
   color-scheme: dark;
 }
@@ -39,312 +40,379 @@ body {
   margin: 0;
   color: var(--text);
   background: transparent;
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font: 15px/1.5 system-ui, -apple-system, "Inter", "Segoe UI", Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
   padding-bottom: calc(var(--dock-h) + 38px + env(safe-area-inset-bottom, 0px));
 }
 body.lock { overflow: hidden; position: fixed; left: 0; right: 0; width: 100%; }
 
-#stars { position: fixed; left: 0; top: 0; z-index: -2; display: block; pointer-events: none; }
+/* Sleek Background Gradient */
+#bg-glow {
+  position: fixed; top: -20%; left: -10%; width: 120%; height: 120%; z-index: -2;
+  background: radial-gradient(circle at 50% 0%, rgba(129, 140, 248, 0.15), transparent 60%),
+              radial-gradient(circle at 80% 80%, rgba(192, 132, 252, 0.1), transparent 50%);
+  pointer-events: none;
+}
 
 main { max-width: 560px; margin: 0 auto; padding: 4px 16px 8px; position: relative; }
 
 /* ---------- header ---------- */
-.hd { padding: calc(16px + env(safe-area-inset-top, 0px)) 2px 2px; }
-.brand { display: flex; align-items: center; gap: 12px; }
-.logo { flex: none; width: 46px; height: 46px; }
+.hd { padding: calc(24px + env(safe-area-inset-top, 0px)) 4px 12px; }
+.brand { display: flex; align-items: center; gap: 16px; }
+.logo { flex: none; width: 52px; height: 52px; border-radius: 14px; box-shadow: 0 8px 24px var(--primary-glow); }
 .bt { flex: 1; min-width: 0; }
-.eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.24em; color: var(--accent); text-transform: uppercase; }
-h1 { margin: 1px 0 0; font-size: 25px; line-height: 1.1; font-weight: 700; letter-spacing: -0.01em; }
-.by { margin: 3px 0 0; color: var(--mute); font-size: 12px; }
-.by b { color: var(--accent2); font-weight: 600; }
+.eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; color: var(--primary); text-transform: uppercase; }
+h1 { margin: 2px 0 0; font-size: 26px; line-height: 1.1; font-weight: 800; letter-spacing: -0.02em; }
+.by { margin: 4px 0 0; color: var(--mute); font-size: 13px; }
+.by b { color: var(--text); font-weight: 600; }
 .ver {
   flex: none; align-self: flex-start;
-  padding: 3px 9px; border-radius: 999px;
-  border: 1px solid var(--line); background: var(--fill);
-  color: var(--accent2); font-size: 11.5px; font-weight: 650;
-}
-.status { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; }
-.chip {
-  display: inline-flex; align-items: center; gap: 6px;
   padding: 4px 10px; border-radius: 999px;
-  background: var(--fill); border: 1px solid var(--line);
-  color: var(--accent2); font-size: 12px; font-weight: 600; line-height: 1.3;
+  border: 1px solid var(--line); background: var(--fill);
+  color: var(--text); font-size: 12px; font-weight: 600;
 }
-.chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--mute); }
-.chip.on i { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.status { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border-radius: 999px;
+  background: var(--fill); border: 1px solid var(--line);
+  color: var(--text); font-size: 12.5px; font-weight: 600; line-height: 1.3;
+  backdrop-filter: blur(8px);
+}
+.chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--mute); }
+.chip.on i { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
 .chip.msg { color: var(--mute); font-weight: 500; }
 
 /* ---------- views & cards ---------- */
 .view { display: none; }
-.view.active { display: block; animation: vin 0.2s ease-out both; }
-@keyframes vin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.view.active { display: block; animation: vin 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes vin { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
 
 .card {
-  margin-top: 12px; padding: 16px 15px;
-  border-radius: 22px; border: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--card-a), var(--card-b));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  margin-top: 16px; padding: 20px;
+  border-radius: 24px; border: 1px solid var(--card-border);
+  background: var(--card); backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 .ch { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-h2 { margin: 0; font-size: 16px; font-weight: 650; }
+h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
 .tag {
-  flex: none; padding: 2px 9px; border-radius: 999px;
-  background: rgba(255, 210, 122, 0.12); color: var(--warn);
-  font-size: 11px; font-weight: 650;
+  flex: none; padding: 3px 10px; border-radius: 999px;
+  background: rgba(251, 191, 36, 0.15); color: var(--warn);
+  font-size: 11.5px; font-weight: 700;
 }
-.tag.n { background: rgba(143, 164, 255, 0.14); color: var(--accent2); }
-.cap { margin: 3px 0 13px; color: var(--mute); font-size: 12.5px; line-height: 1.4; }
-.cap b { color: var(--accent2); font-weight: 600; }
+.tag.n { background: rgba(129, 140, 248, 0.15); color: var(--primary); }
+.cap { margin: 4px 0 16px; color: var(--mute); font-size: 13px; line-height: 1.5; }
+.cap b { color: var(--text); font-weight: 600; }
 
-.row { margin-top: 18px; }
-.cap + .row { margin-top: 2px; }
+.row { margin-top: 20px; }
+.cap + .row { margin-top: 4px; }
 .rh { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-.rh label, .rh .lb { font-weight: 650; font-size: 14px; }
+.rh label, .rh .lb { font-weight: 700; font-size: 14.5px; }
 .val {
-  flex: none; min-width: 58px; padding: 2px 11px; border-radius: 999px;
-  background: rgba(143, 164, 255, 0.14); color: var(--accent2);
-  font-size: 13px; font-weight: 650; text-align: center;
+  flex: none; min-width: 64px; padding: 3px 12px; border-radius: 999px;
+  background: rgba(129, 140, 248, 0.15); color: var(--primary);
+  font-size: 13px; font-weight: 700; text-align: center;
 }
-.desc { margin: 2px 0 8px; color: var(--mute); font-size: 12.5px; line-height: 1.35; }
-.pnote { margin: 8px 2px 0; color: var(--mute); font-size: 11.5px; line-height: 1.4; }
-.pnote b { color: var(--accent2); font-weight: 600; }
+.desc { margin: 4px 0 10px; color: var(--mute); font-size: 13px; line-height: 1.4; }
+.pnote { margin: 12px 2px 0; color: var(--mute); font-size: 12px; line-height: 1.5; }
+.pnote b { color: var(--text); font-weight: 600; }
 
 /* ---------- look tiles ---------- */
 .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .mode {
-  position: relative; display: flex; flex-direction: column; gap: 3px;
-  align-items: flex-start; text-align: left;
-  min-height: 70px; padding: 11px 12px 10px;
+  display: grid; grid-template-columns: 1fr auto;
+  grid-template-areas: "ic dot" "ti ti" "de de";
+  row-gap: 2px; align-items: center; text-align: left;
+  min-height: 0; padding: 10px 12px;
   border-radius: 16px; border: 1px solid var(--line); background: var(--fill);
   color: var(--text); font: inherit; cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: all 0.2s ease;
 }
-.mode .mt { display: flex; align-items: center; gap: 8px; }
-.mode svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; color: var(--mute); }
-.mode b { font-size: 14px; font-weight: 650; }
-.mode small { color: var(--mute); font-size: 11.5px; line-height: 1.3; }
-.mode[aria-checked="true"] { border-color: rgba(143, 164, 255, 0.7); background: rgba(143, 164, 255, 0.13); }
-.mode[aria-checked="true"] svg { color: var(--accent2); }
+.mode[data-m="4"] { grid-column: 1 / -1; }
+.mode .mt { display: contents; }
+.mode svg { grid-area: ic; width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: var(--mute); transition: color 0.2s; }
+.mode b { grid-area: ti; font-size: 14px; font-weight: 700; line-height: 1.2; }
+.mode small { grid-area: de; color: var(--mute); font-size: 11.5px; line-height: 1.25; transition: color 0.2s; }
+.mode:hover { background: var(--fill-hover); }
+.mode[aria-checked="true"] { border-color: var(--primary); background: rgba(129, 140, 248, 0.1); box-shadow: 0 4px 20px var(--primary-glow); }
+.mode[aria-checked="true"] svg { color: var(--primary); }
+.mode[aria-checked="true"] small { color: rgba(244, 244, 245, 0.8); }
 .mode[aria-checked="true"]::after {
-  content: ""; position: absolute; top: 11px; right: 11px;
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--accent); box-shadow: 0 0 8px var(--accent);
+  content: ""; grid-area: dot; justify-self: end;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--primary); box-shadow: 0 0 8px var(--primary);
 }
 .mode:focus-visible, .step:focus-visible, .btn:focus-visible, .ib:focus-visible, .sw:focus-visible,
-#dock button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
-
-/* ---------- preview ---------- */
-.pv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 0; justify-items: center; }
-.pv figure { margin: 0; width: 100%; max-width: 142px; text-align: center; }
-.pv canvas { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); background: #0b0e1a; }
-.pv figcaption { margin-top: 6px; color: var(--mute); font-size: 11.5px; }
-.pv figcaption b { color: var(--accent2); font-weight: 650; }
+#dock button:focus-visible, summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 /* ---------- step chips ---------- */
-.steps { display: grid; grid-template-columns: repeat(var(--n, 5), 1fr); gap: 6px; }
+.steps { display: grid; grid-template-columns: repeat(var(--n, 5), 1fr); gap: 8px; }
 .step {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  min-height: 44px; padding: 6px 2px;
-  border-radius: 13px; border: 1px solid var(--line); background: var(--fill);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 48px; padding: 8px 4px;
+  border-radius: 14px; border: 1px solid var(--line); background: var(--fill);
   color: var(--text); font: inherit; cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: all 0.2s ease;
 }
-.step b { font-size: 12.5px; font-weight: 650; }
-.step small { color: var(--mute); font-size: 10.5px; }
-.step[aria-checked="true"] { background: linear-gradient(180deg, var(--accent2), var(--accent)); border-color: transparent; color: var(--ink); }
-.step[aria-checked="true"] small { color: rgba(10, 14, 28, 0.7); }
-.steps[aria-disabled="true"] { opacity: 0.38; pointer-events: none; }
+.step b { font-size: 13px; font-weight: 700; }
+.step small { color: var(--mute); font-size: 11px; }
+.step:hover { background: var(--fill-hover); }
+.step[aria-checked="true"] { background: linear-gradient(135deg, var(--primary), var(--accent)); border-color: transparent; color: var(--ink); box-shadow: 0 4px 16px var(--primary-glow); }
+.step[aria-checked="true"] small { color: rgba(9, 9, 11, 0.75); }
+.steps[aria-disabled="true"] { opacity: 0.4; pointer-events: none; filter: grayscale(1); }
 
-/* ---------- sliders (large invisible grab handle keeps dragging easy) ---------- */
-.sl { position: relative; --f: 0; }
+/* ---------- sliders ---------- */
+.sl { position: relative; --f: 0; margin-top: 8px; }
 .grab {
-  position: absolute; top: 50%; left: calc(12px + (100% - 24px) * var(--f));
-  width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
+  position: absolute; top: 50%; left: calc(14px + (100% - 28px) * var(--f));
+  width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
   touch-action: none; cursor: grab; z-index: 1;
 }
 .grab:active { cursor: grabbing; }
 input[type=range] {
   -webkit-appearance: none; appearance: none;
-  width: 100%; height: 34px; margin: 0;
+  width: 100%; height: 36px; margin: 0;
   background: transparent; pointer-events: none; --p: 50%;
 }
 input[type=range]::-webkit-slider-runnable-track {
   height: 8px; border-radius: 99px;
-  background: linear-gradient(90deg, var(--accent) 0, var(--violet) var(--p), var(--track) var(--p));
+  background: linear-gradient(90deg, var(--primary) 0, var(--accent) var(--p), var(--track) var(--p));
 }
 input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 26px; height: 26px; margin-top: -9px;
+  -webkit-appearance: none; width: 28px; height: 28px; margin-top: -10px;
   border-radius: 50%; background: #fff; border: 0;
-  box-shadow: 0 0 0 4px rgba(143, 164, 255, 0.22), 0 0 12px rgba(143, 164, 255, 0.7);
+  box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.2), 0 0 16px rgba(129, 140, 248, 0.6);
+  transition: transform 0.1s;
 }
-input[type=range]:focus-visible { outline: 2px solid var(--accent2); outline-offset: 3px; border-radius: 10px; }
+.grab:active + input[type=range]::-webkit-slider-thumb { transform: scale(1.1); }
+input[type=range]:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 14px; }
 
 /* ---------- switches ---------- */
 .sw {
-  display: flex; justify-content: space-between; align-items: center; gap: 12px;
-  width: 100%; min-height: 50px; padding: 6px 0;
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+  width: 100%; min-height: 56px; padding: 8px 0;
   background: none; border: 0; color: var(--text);
   font: inherit; text-align: left; cursor: pointer;
 }
 .sw + .sw { border-top: 1px solid var(--line); }
-.sw .t { font-weight: 650; font-size: 14px; display: block; }
-.sw .d { display: block; color: var(--mute); font-size: 12.5px; font-weight: 400; margin-top: 1px; }
+.sw .t { font-weight: 700; font-size: 14.5px; display: block; }
+.sw .d { display: block; color: var(--mute); font-size: 13px; font-weight: 400; margin-top: 2px; }
 .sw.dim { opacity: 0.5; }
-.knob { flex: none; position: relative; width: 46px; height: 28px; border-radius: 99px; background: var(--track); transition: background 0.15s; }
+.knob { flex: none; position: relative; width: 50px; height: 30px; border-radius: 99px; background: var(--track); transition: background 0.2s ease; }
 .knob::after {
   content: ""; position: absolute; top: 3px; left: 3px;
-  width: 22px; height: 22px; border-radius: 50%; background: #fff;
-  transition: transform 0.15s;
+  width: 24px; height: 24px; border-radius: 50%; background: #fff;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
-.sw[aria-checked="true"] .knob { background: var(--accent); }
-.sw[aria-checked="true"] .knob::after { transform: translateX(18px); }
-#groups .sw { content-visibility: auto; contain-intrinsic-size: auto 52px; }
+.sw[aria-checked="true"] .knob { background: var(--ok); }
+.sw[aria-checked="true"] .knob::after { transform: translateX(20px); }
+.sw:disabled { cursor: not-allowed; opacity: 0.6; }
+#groups .sw { content-visibility: auto; contain-intrinsic-size: auto 56px; }
 
 /* ---------- buttons ---------- */
 .btn {
-  display: block; width: 100%; min-height: 46px; padding: 9px 14px;
-  font: inherit; font-weight: 650; font-size: 14px; color: var(--text);
-  background: var(--fill); border: 1px solid var(--line); border-radius: 14px; cursor: pointer;
+  display: block; width: 100%; min-height: 48px; padding: 10px 16px;
+  font: inherit; font-weight: 700; font-size: 14.5px; color: var(--text);
+  background: var(--fill); border: 1px solid var(--line); border-radius: 16px; cursor: pointer;
+  transition: all 0.2s ease;
 }
+.btn:hover { background: var(--fill-hover); }
 .btn.warn { color: var(--warn); }
-.btn.armed { background: rgba(255, 143, 136, 0.16); border-color: var(--bad); color: var(--bad); }
-.btn:active, .mode:active, .step:active { transform: scale(0.985); }
+.btn.armed { background: rgba(248, 113, 113, 0.15); border-color: var(--bad); color: var(--bad); }
+.btn:active, .mode:active, .step:active, .ib:active { transform: scale(0.97); }
 .ib {
-  flex: none; width: 34px; height: 34px; padding: 0; display: grid; place-items: center;
-  border-radius: 11px; border: 1px solid var(--line); background: var(--fill);
-  color: var(--accent2); cursor: pointer;
+  flex: none; width: 38px; height: 38px; padding: 0; display: grid; place-items: center;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--fill);
+  color: var(--text); cursor: pointer; transition: all 0.2s ease;
 }
-.ib svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; }
-.stack { display: grid; gap: 9px; }
+.ib:hover { background: var(--fill-hover); }
+.ib svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.stack { display: grid; gap: 10px; }
 
 .banner {
-  margin-top: 12px; padding: 11px 13px; border-radius: 14px;
-  border: 1px solid var(--line); background: var(--card-b); font-size: 13px;
+  margin-top: 16px; padding: 14px 16px; border-radius: 16px;
+  border: 1px solid var(--line); background: var(--card); font-size: 13.5px; line-height: 1.5;
+  backdrop-filter: blur(12px);
 }
-.banner.warn { border-color: var(--warn); color: var(--warn); }
-.banner.bad { border-color: var(--bad); color: var(--bad); }
-.banner .btn { margin-top: 9px; min-height: 40px; }
+.banner.warn { border-color: rgba(251, 191, 36, 0.4); color: var(--warn); background: rgba(251, 191, 36, 0.05); }
+.banner.bad { border-color: rgba(248, 113, 113, 0.4); color: var(--bad); background: rgba(248, 113, 113, 0.05); }
+.banner .btn { margin-top: 12px; min-height: 42px; }
 
 textarea {
-  display: block; width: 100%; min-height: 100px; padding: 10px 11px;
-  border-radius: 12px; border: 1px solid var(--line); background: #07090f; color: #c8d0f0;
-  font: 12.5px/1.45 ui-monospace, Menlo, Consolas, monospace; resize: vertical;
+  display: block; width: 100%; min-height: 100px; padding: 12px 14px;
+  border-radius: 16px; border: 1px solid var(--line); background: rgba(0,0,0,0.3); color: var(--text);
+  font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; resize: vertical;
+  transition: border-color 0.2s;
 }
+textarea:focus { outline: none; border-color: var(--primary); }
+
+/* ---------- Skip Manager UI ---------- */
+.skip-input-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.skip-list { display: flex; flex-direction: column; gap: 8px; }
+.skip-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--fill);
+}
+.skip-item.builtin { background: rgba(255,255,255,0.02); border-style: dashed; }
+.skip-item.off .skip-info { opacity: 0.45; }
+.skip-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.skip-info span { font-family: ui-monospace, monospace; font-size: 13.5px; font-weight: 600; word-break: break-all; }
+.skip-info small { font-size: 11.5px; color: var(--mute); }
+.skip-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.skip-actions .sw { min-height: auto; width: auto; padding: 0; border: none; }
+.skip-del { color: var(--mute); border-color: transparent; background: transparent; }
+.skip-del:hover { color: var(--bad); background: rgba(248, 113, 113, 0.1); }
+.skip-del.confirm { color: var(--ok); background: rgba(52, 211, 153, 0.1); }
 
 /* ---------- stat tiles ---------- */
-.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.tile { padding: 11px 4px 9px; border-radius: 14px; background: var(--fill); border: 1px solid var(--line); text-align: center; }
-.tile b { display: block; font-size: 20px; line-height: 1.15; font-weight: 700; font-variant-numeric: tabular-nums; }
-.tile span { display: block; margin-top: 2px; color: var(--mute); font-size: 10.5px; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase; }
-.legend { list-style: none; margin: 13px 0 0; padding: 0; display: grid; gap: 7px; color: var(--mute); font-size: 12px; line-height: 1.4; }
-.legend b { color: var(--accent2); font-weight: 650; }
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.tile { padding: 14px 6px 12px; border-radius: 16px; background: var(--fill); border: 1px solid var(--line); text-align: center; }
+.tile b { display: block; font-size: 22px; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tile span { display: block; margin-top: 4px; color: var(--mute); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.legend { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; color: var(--mute); font-size: 12.5px; line-height: 1.5; }
+.legend b { color: var(--text); font-weight: 700; }
 .tile.ok b { color: var(--ok); }
 .tile.warn b { color: var(--warn); }
 
 /* ---------- log status, details, key/values ---------- */
 .logstat {
-  margin-top: 2px; padding: 10px 12px; border-radius: 12px;
-  border: 1px solid var(--line); background: rgba(0, 0, 0, 0.28);
-  font-size: 12px; line-height: 1.55; word-break: break-word;
+  margin-top: 4px; padding: 14px 16px; border-radius: 16px;
+  border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3);
+  font-size: 13px; line-height: 1.6; word-break: break-word;
 }
-.logstat b { color: var(--accent2); font-weight: 650; }
-.logstat .ok { color: #7ddea0; }
-.logstat .warn { color: #e8c27a; }
-.logstat .bad { color: #f0a0a0; }
-.logstat .startline { opacity: 0.85; font-size: 11px; margin-top: 2px; }
-.logstat .expgap { margin-top: 6px; }
+.logstat b { color: var(--text); font-weight: 700; }
+.logstat .ok { color: var(--ok); }
+.logstat .warn { color: var(--warn); }
+.logstat .bad { color: var(--bad); }
+.logstat .startline { opacity: 0.8; font-size: 12px; margin-top: 4px; }
+.logstat .expgap { margin-top: 8px; }
 
-details summary { list-style: none; cursor: pointer; border-radius: 10px; }
+details summary { list-style: none; cursor: pointer; border-radius: 12px; }
 details summary::-webkit-details-marker { display: none; }
-summary svg { flex: none; width: 20px; height: 20px; stroke: var(--mute); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s; }
+summary svg { flex: none; width: 22px; height: 22px; stroke: var(--mute); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.2s; }
 details[open] summary svg { transform: rotate(180deg); }
-details .body { margin-top: 12px; }
+details .body { margin-top: 16px; }
 
-.kv { display: flex; justify-content: space-between; gap: 14px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; }
-.kv:first-child { border-top: 0; padding-top: 2px; }
+.kv { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+.kv:first-child { border-top: 0; padding-top: 4px; }
 .kv span { color: var(--mute); }
 .kv b { font-weight: 600; text-align: right; word-break: break-all; }
 .kv b.ok { color: var(--ok); }
 .kv b.warn { color: var(--warn); }
 
-.foot { margin: 18px 2px 6px; color: var(--mute); font-size: 12px; text-align: center; line-height: 1.5; }
+.foot { margin: 24px 4px 12px; color: var(--mute); font-size: 12.5px; text-align: center; line-height: 1.5; }
 
 /* ---------- dock ---------- */
 #dock {
-  position: fixed; left: 12px; right: 12px; z-index: 40;
-  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  max-width: 536px; margin: 0 auto; height: var(--dock-h);
-  display: flex; align-items: center; gap: 6px; padding: 6px;
-  border-radius: 24px; border: 1px solid var(--line);
-  background: rgba(13, 16, 29, 0.97); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  position: fixed; left: 16px; right: 16px; z-index: 40;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  max-width: 528px; margin: 0 auto; height: var(--dock-h);
+  display: flex; align-items: center; gap: 8px; padding: 8px;
+  border-radius: 28px; border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(9, 9, 11, 0.85); backdrop-filter: blur(24px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }
-#dock .tabs { flex: 1; min-width: 0; height: 100%; display: flex; }
+#pendbar {
+  position: fixed; left: 16px; right: 16px; z-index: 41; display: none;
+  max-width: 528px; margin: 0 auto;
+  bottom: calc(var(--dock-h) + 28px + env(safe-area-inset-bottom, 0px));
+  align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 8px 8px 16px; border-radius: 22px;
+  border: 1px solid rgba(251, 191, 36, 0.35); background: rgba(24, 24, 27, 0.96);
+  backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+body.pend #pendbar { display: flex; animation: vin 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+#pendbar .pt { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--warn); font-size: 13px; font-weight: 700; line-height: 1.2; }
+#pendbar .pt i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+#cancelChg {
+  flex: none; height: 42px; padding: 0 16px; display: flex; align-items: center; gap: 8px;
+  border: 0; border-radius: 16px; cursor: pointer;
+  background: linear-gradient(135deg, #f87171, #fb923c); color: #fff;
+  font: inherit; font-weight: 800; font-size: 14px;
+  box-shadow: 0 4px 16px rgba(248, 113, 113, 0.3); transition: transform 0.2s ease;
+}
+#cancelChg svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+#cancelChg:active { transform: scale(0.95); }
+#cancelChg:focus-visible { outline: 2px solid var(--warn); outline-offset: 2px; }
+body.pend { padding-bottom: calc(var(--dock-h) + 100px + env(safe-area-inset-bottom, 0px)); }
+body.pend #toast { bottom: calc(var(--dock-h) + 92px + env(safe-area-inset-bottom, 0px)); }
+body.pend #dockcover { height: calc(var(--dock-h) + 16px + env(safe-area-inset-bottom, 0px) + 28px + 60px); }
+#dockcover {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 39; pointer-events: none;
+  height: calc(var(--dock-h) + 16px + env(safe-area-inset-bottom, 0px) + 28px);
+  background: linear-gradient(to top, var(--bg) 0, var(--bg) calc(100% - 28px), rgba(9, 9, 11, 0) 100%);
+}
+#dock .tabs { flex: 1; min-width: 0; height: 100%; display: flex; gap: 4px; }
 #dock .tabs button {
-  flex: 1; height: 100%; padding: 0; border: 0; border-radius: 18px; background: none;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  color: var(--mute); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer;
+  flex: 1; height: 100%; padding: 0; border: 0; border-radius: 20px; background: transparent;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  color: var(--mute); font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  transition: all 0.2s ease;
 }
-#dock .tabs svg, .apply svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-#dock .tabs button.on { color: var(--accent2); background: rgba(143, 164, 255, 0.13); }
+#dock .tabs svg, .apply svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#dock .tabs button:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+#dock .tabs button.on { color: var(--primary); background: rgba(129, 140, 248, 0.15); }
 .apply {
-  flex: none; position: relative; height: 100%; padding: 0 18px;
-  display: flex; align-items: center; gap: 7px;
-  border: 0; border-radius: 18px;
-  background: linear-gradient(135deg, var(--accent2), var(--accent) 55%, var(--violet));
-  color: var(--ink); font: inherit; font-weight: 750; font-size: 14px; cursor: pointer;
+  flex: none; position: relative; height: 100%; padding: 0 20px;
+  display: flex; align-items: center; gap: 8px;
+  border: 0; border-radius: 20px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer;
+  box-shadow: 0 4px 16px var(--primary-glow);
+  transition: transform 0.2s ease;
 }
-.apply svg { width: 18px; height: 18px; stroke-width: 2.1; }
-.apply:active { transform: scale(0.97); }
+.apply:active { transform: scale(0.95); }
 .apply::after {
-  content: ""; display: none; position: absolute; top: 6px; right: 6px;
-  width: 11px; height: 11px; border-radius: 50%;
-  background: var(--warn); border: 2px solid var(--ink);
+  content: ""; display: none; position: absolute; top: 8px; right: 8px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--warn); border: 2px solid var(--primary);
 }
-body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infinite; }
-@keyframes pulse { 50% { transform: scale(1.3); opacity: 0.65; } }
+body.pend .apply::after { display: block; animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.4); opacity: 0.7; } }
 
 /* ---------- toast & log window ---------- */
 #toast {
-  position: fixed; left: 14px; right: 14px; z-index: 50;
-  bottom: calc(var(--dock-h) + 24px + env(safe-area-inset-bottom, 0px));
-  max-width: 532px; margin: 0 auto; padding: 12px 15px;
-  border-radius: 16px; background: var(--text); color: #0a0d18;
-  font-weight: 650; font-size: 13.5px; text-align: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  opacity: 0; transform: translateY(8px); pointer-events: none;
-  transition: opacity 0.18s, transform 0.18s;
+  position: fixed; left: 16px; right: 16px; z-index: 50;
+  bottom: calc(var(--dock-h) + 32px + env(safe-area-inset-bottom, 0px));
+  max-width: 528px; margin: 0 auto; padding: 14px 16px;
+  border-radius: 18px; background: var(--text); color: var(--ink);
+  font-weight: 700; font-size: 14px; text-align: center;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  opacity: 0; transform: translateY(12px) scale(0.95); pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 #toast.show { opacity: 1; transform: none; }
 #logw {
   position: fixed; inset: 0; z-index: 60; display: none;
-  padding: calc(14px + env(safe-area-inset-top, 0px)) 12px calc(14px + env(safe-area-inset-bottom, 0px));
-  background: rgba(2, 3, 8, 0.94); overscroll-behavior: contain; touch-action: none;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  background: rgba(9, 9, 11, 0.95); backdrop-filter: blur(16px);
+  overscroll-behavior: contain; touch-action: none;
 }
-#logw.open { display: flex; flex-direction: column; gap: 9px; }
-#logw h3 { margin: 0 2px; font-size: 13px; font-weight: 650; color: var(--mute); }
+#logw.open { display: flex; flex-direction: column; gap: 12px; }
+#logw h3 { margin: 0 4px; font-size: 14px; font-weight: 700; color: var(--mute); }
 #logw pre {
-  flex: 1; margin: 0; padding: 12px; overflow: auto;
-  border-radius: 14px; border: 1px solid var(--line); background: #07090f; color: #c8d0f0;
-  font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace;
+  flex: 1; margin: 0; padding: 16px; overflow: auto;
+  border-radius: 20px; border: 1px solid var(--line); background: rgba(0,0,0,0.4); color: var(--text);
+  font: 12.5px/1.5 ui-monospace, Menlo, Consolas, monospace;
   white-space: pre-wrap; word-break: break-all;
   touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
 }
 
-@media (max-width: 340px) {
+@media (max-width: 360px) {
   .tiles { grid-template-columns: 1fr 1fr; }
   .mode small { display: none; }
-  .mode { min-height: 52px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .view.active, body.pend .apply::after { animation: none; }
-  .knob, .knob::after, #toast, .mode, .step, summary svg { transition: none; }
+  .view.active, body.pend .apply::after, #toast.show { animation: none; transition: none; }
+  .knob, .knob::after, .mode, .step, summary svg, .btn, .ib { transition: none; }
 }
 </style>
 </head>
 <body>
-<canvas id="stars" aria-hidden="true"></canvas>
+<div id="bg-glow"></div>
 
 <main>
   <header class="hd">
@@ -352,18 +420,18 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
       <svg class="logo" viewBox="0 0 44 44" aria-hidden="true">
         <defs>
           <linearGradient id="lg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="44" y2="44">
-            <stop offset="0" stop-color="#c5d0ff"/><stop offset="1" stop-color="#8fa4ff"/>
+            <stop offset="0" stop-color="#c084fc"/><stop offset="1" stop-color="#818cf8"/>
           </linearGradient>
         </defs>
         <g fill="url(#lg)">
           <rect x="3" y="3" width="11" height="11" rx="3"/>
-          <rect x="16.5" y="3" width="11" height="11" rx="3" opacity=".55"/>
-          <rect x="30" y="3" width="11" height="11" rx="3" opacity=".22"/>
-          <rect x="3" y="16.5" width="11" height="11" rx="3" opacity=".55"/>
+          <rect x="16.5" y="3" width="11" height="11" rx="3" opacity=".6"/>
+          <rect x="30" y="3" width="11" height="11" rx="3" opacity=".25"/>
+          <rect x="3" y="16.5" width="11" height="11" rx="3" opacity=".6"/>
           <rect x="16.5" y="16.5" width="11" height="11" rx="3"/>
-          <rect x="30" y="16.5" width="11" height="11" rx="3" opacity=".55"/>
-          <rect x="3" y="30" width="11" height="11" rx="3" opacity=".22"/>
-          <rect x="16.5" y="30" width="11" height="11" rx="3" opacity=".55"/>
+          <rect x="30" y="16.5" width="11" height="11" rx="3" opacity=".6"/>
+          <rect x="3" y="30" width="11" height="11" rx="3" opacity=".25"/>
+          <rect x="16.5" y="30" width="11" height="11" rx="3" opacity=".6"/>
           <rect x="30" y="30" width="11" height="11" rx="3"/>
         </g>
       </svg>
@@ -381,7 +449,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   <!-- ========== HOME ========== -->
   <div class="view active" id="v-home">
     <section class="card">
-      <div class="ch"><h2>Look</h2><span class="tag">Test Tex is experimental</span></div>
+      <div class="ch"><h2>Look</h2></div>
       <p class="cap">Choose one look. Turning one on turns the others off.</p>
 
       <div class="modes" id="lookSeg" role="radiogroup" aria-label="Look mode">
@@ -402,16 +470,10 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
           <small>Near-solid colors</small>
         </button>
         <button type="button" class="mode" role="radio" aria-checked="false" data-m="4">
-          <span class="mt"><svg viewBox="0 0 24 24"><path d="M4 4h4v4H4zM10 4h4v4h-4zM16 4h4v4h-4zM4 10h4v4H4zM10 10h4v4h-4zM16 10h4v4h-4zM4 16h4v4H4zM10 16h4v4h-4zM16 16h4v4h-4z"/></svg><b>Test Tex</b></span>
-          <small>True pixel (experimental)</small>
+          <span class="mt"><svg viewBox="0 0 24 24"><path d="M4 4h4v4H4zM10 4h4v4h-4zM16 4h4v4h-4zM4 10h4v4H4zM10 10h4v4h-4zM16 10h4v4h-4zM4 16h4v4H4zM10 16h4v4h-4zM16 16h4v4h-4z"/></svg><b>True Pixelated</b></span>
+          <small>True pixel rendering</small>
         </button>
       </div>
-
-      <div class="pv" aria-hidden="true">
-        <figure><canvas id="pvA" width="256" height="256"></canvas><figcaption>Original</figcaption></figure>
-        <figure><canvas id="pvB" width="256" height="256"></canvas><figcaption id="pvBc">No look</figcaption></figure>
-      </div>
-      <p class="pnote">Sample texture, approximate. Real results depend on each texture's size.</p>
 
       <div class="row" id="strRow">
         <div class="rh"><span class="lb" id="strL">Strength</span><span class="val" id="strV">—</span></div>
@@ -500,15 +562,20 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
 
     <section class="card">
       <details id="skipd">
-        <summary class="ch"><h2>Skip list</h2><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <summary class="ch"><h2>Skip Manager</h2><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
         <div class="body">
-          <p class="cap">One group per line. Use <b>format size</b> or <b>format width height</b>. Textures in these groups stay original. A few built-in skips are always on and cannot be removed here.</p>
-          <textarea id="skipt" rows="5" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Skip list"></textarea>
-          <div class="grid2">
-            <button class="btn" id="skips" type="button">Save list</button>
-            <button class="btn" id="skipr" type="button">Reload</button>
+          <p class="cap">Manage custom skip rules. Textures matching these rules stay original. Use <b>format size</b> or <b>format width height</b>.</p>
+          
+          <div class="skip-input-group">
+            <textarea id="skipt" rows="2" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Paste skip lines here (e.g. 37497 256 512)"></textarea>
+            <button class="btn" id="skipAdd" type="button">Add to List</button>
           </div>
-          <p class="pnote">Numbers come from the log (for example 37496 is ETC2 RGBA). Tap Apply after saving.</p>
+          
+          <div class="skip-list" id="skipList">
+            <!-- Skip items rendered here -->
+          </div>
+          
+          <p class="pnote">Built-in rules protect scopes and character detail. Switch one off or delete it to let those textures be changed. Reset defaults restores them.</p>
         </div>
       </details>
     </section>
@@ -537,7 +604,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
       <h2>Log</h2>
       <p class="cap">View, export or clear the frame log (codm_tex.log).</p>
       <div id="logStat" class="logstat">Checking log…</div>
-      <div class="stack" style="margin-top:10px">
+      <div class="stack" style="margin-top:12px">
         <div class="grid2" style="margin-top:0">
           <button class="btn" id="vlog" type="button">View log</button>
           <button class="btn" id="exp" type="button">Export log</button>
@@ -552,8 +619,17 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
 
     <section class="card">
       <h2>Reset</h2>
-      <p class="cap">Puts every setting back to the defaults shipped with the module.</p>
-      <button class="btn warn" id="reset" type="button">Reset defaults</button>
+      <p class="cap">Two ways to start over. Each one asks you to tap twice to confirm.</p>
+      <div class="stack">
+        <div>
+          <button class="btn warn" id="reset" type="button">Reset defaults</button>
+          <p class="pnote">Recommended setup: <b>True Pixelated</b> (Normal size, Sharp edges) with a <b>20 s</b> start delay. Skip rules go back to the built-ins.</p>
+        </div>
+        <div>
+          <button class="btn warn" id="normal" type="button">Back to normal CODM</button>
+          <p class="pnote">Turns every effect off: no look, full render scale, no fps cap, no start delay. Logs and skip rules stay as they are.</p>
+        </div>
+      </div>
     </section>
 
     <section class="card">
@@ -562,7 +638,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
       <div class="kv"><span>Version</span><b id="aVer">—</b></div>
       <div class="kv"><span>Author</span><b>Q9 Papyrus</b></div>
       <div class="kv"><span>Module mode</span><b id="aMode">—</b></div>
-      <div class="kv"><span>Settings folder</span><b style="font-size:11.5px;font-weight:500">/data/data/com.garena.game.codm/files</b></div>
+      <div class="kv"><span>Settings folder</span><b style="font-size:12px;font-weight:500">/data/data/com.garena.game.codm/files</b></div>
       <p class="pnote">Module mode 4 hooks the game's engine the moment it loads, with no background polling. That is the mode this module needs. Modes 0–3 are only for testing.</p>
     </section>
 
@@ -571,6 +647,11 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
 </main>
 
 <!-- dock: tabs + always-visible Apply -->
+<div id="pendbar" role="region" aria-label="Unapplied changes">
+  <span class="pt"><i></i>Changes not applied yet</span>
+  <button type="button" id="cancelChg"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>Cancel changes</button>
+</div>
+<div id="dockcover" aria-hidden="true"></div>
 <nav id="dock" aria-label="Main">
   <div class="tabs">
     <button type="button" data-v="home" class="on" aria-current="page">
@@ -620,6 +701,16 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   var REC = {
     blk: 0, bias: 0, near: 1, scale: 0, fps: 0,
     fz: 1, th: 1, core: 1, mode: 4,
+    minsz: 64, delay: 20, style: 0, sedge: 1, flat: 0, testtex: 1, ttsize: 0, ttsm: 0
+  };
+  /* "Back to normal CODM": every effect off (logging, mode and skip lists are left alone) */
+  var NORMAL = {
+    blk: 0, bias: 0, near: 1, scale: 0, fps: 0,
+    minsz: 64, delay: 0, style: 0, sedge: 1, flat: 0, testtex: 0, ttsize: 0, ttsm: 0
+  };
+  /* what a missing settings file counts as (mirrors how the page reads it) */
+  var FALLBACK = {
+    blk: 0, bias: 0, near: 1, scale: 0, fps: 0, fz: 1, th: 1, core: 1, mode: 0,
     minsz: 64, delay: 0, style: 0, sedge: 1, flat: 0, testtex: 0, ttsize: 0, ttsm: 0
   };
 
@@ -628,7 +719,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     blk: "0", bias: "0", near: "1", scale: "0", fps: "0",
     fz: "1", th: "1", core: "1", mode: "4",
     minsz: "64", delay: "0", style: "0", sedge: "1", flat: "0", testtex: "0", ttsize: "0", ttsm: "0",
-    skip: "", ver: "v0.24",
+    skip: "", bloff: "", bldel: "", ver: "v0.24",
     texg: "TEXG t=60 fmt=37812 hex=0x93b4 sz=1024 n=40 ap=40\nTEXG t=60 fmt=37812 hex=0x93b4 sz=2048 n=6 ap=6\nTEXG t=60 fmt=37815 hex=0x93b7 sz=512 n=120 ap=120\nTEXG t=60 fmt=37496 hex=0x9278 sz=256 n=64 ap=60\nTEXG t=60 fmt=37497 hex=0x9279 sz=512 n=12 ap=0",
     ft: "FT fps=55.2 avg=18.1ms p50=17.6 p99=41.3 max=63.0 >33ms=3 >50ms=1 n=276 cap=0 bias=0 scale=100 t=125.0 fz=1"
   };
@@ -644,10 +735,44 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   var TTSMN = ["Sharp", "Soft"];
   var TTSMD = ["Hard square pixels.", "Softens the jump between mip levels. Pixels stay square."];
   var ttSize = 0, ttSm = 0;
-  var lookMode = 0;   /* 0=Off  1=Pixel Blocks  2=Detail Cut  3=Flat  4=Test Tex */
+  var lookMode = 0;   /* 0=Off  1=Pixel Blocks  2=Detail Cut  3=Flat  4=True Pixelated */
   var strVal = 3;     /* 1-5 for blocks, 1-4 for detail cut / flat */
   var fpsVal = 0, minVal = 64;
-  var groups = [], skipSet = {}, extraSkip = [];
+  
+  /* Skip Manager State */
+  var groups = [], skipSet = {};
+  var customSkips = [];
+  var blOff = {}, blDel = {};
+
+  /* ---------- pending-change tracking ----------
+     cur  = what the settings files hold right now
+     base = what they held when the page opened or at the last Apply */
+  var KEYS = ["bias", "scale", "fps", "fz", "th", "core", "near", "blk", "minsz", "delay",
+              "style", "sedge", "flat", "testtex", "ttsize", "ttsm", "mode"];
+  var cur = {}, base = null, baseSkipLines = [], baseBlOff = {}, baseBlDel = {};
+  function nl(lines) { return lines.slice().sort().join("\n"); }
+  function nk(o) { return Object.keys(o).sort().join("|"); }
+  function fromState(s) {
+    var o = {};
+    KEYS.forEach(function (k) {
+      var n = parseInt(s[k], 10);
+      o[k] = String(isNaN(n) ? FALLBACK[k] : n);
+    });
+    return o;
+  }
+  function isPending() {
+    if (!base) return false;
+    for (var i = 0; i < KEYS.length; i++) if (cur[KEYS[i]] !== base[KEYS[i]]) return true;
+    return cur.skip !== base.skip || cur.bloff !== base.bloff || cur.bldel !== base.bldel;
+  }
+  function updatePend() { var p = isPending(); setPend(p); return p; }
+  function setBaseline() {
+    base = Object.assign({}, cur);
+    baseSkipLines = skipLines();
+    baseBlOff = Object.assign({}, blOff);
+    baseBlDel = Object.assign({}, blDel);
+  }
+  var builtins = ["37497 256 512", "37493 128 128", "37492 128 128", "37497 128 128"];
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -672,58 +797,6 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     var n = parseFloat(v);
     return isNaN(n) ? "—" : (d ? n.toFixed(d) : String(Math.round(n)));
   }
-
-  /* ---------- stars (drawn once; cheap and never repainted on scroll) ---------- */
-  function rng(seed) {
-    return function () {
-      seed = (seed * 1664525 + 1013904223) >>> 0;
-      return seed / 4294967296;
-    };
-  }
-  var starW = 0;
-  function drawStars() {
-    var c = $("stars"), dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var w = window.innerWidth;
-    var h = Math.max(window.innerHeight, (window.screen && screen.height) || 0);
-    starW = w;
-    c.width = Math.round(w * dpr);
-    c.height = Math.round(h * dpr);
-    c.style.width = w + "px";
-    c.style.height = h + "px";
-    var x = c.getContext("2d");
-    x.scale(dpr, dpr);
-    x.fillStyle = "#06070c";
-    x.fillRect(0, 0, w, h);
-    var g = x.createRadialGradient(w * 0.15, 0, 0, w * 0.15, 0, h * 0.55);
-    g.addColorStop(0, "rgba(143,164,255,0.17)");
-    g.addColorStop(1, "rgba(143,164,255,0)");
-    x.fillStyle = g;
-    x.fillRect(0, 0, w, h);
-    g = x.createRadialGradient(w, h, 0, w, h, h * 0.5);
-    g.addColorStop(0, "rgba(182,156,255,0.11)");
-    g.addColorStop(1, "rgba(182,156,255,0)");
-    x.fillStyle = g;
-    x.fillRect(0, 0, w, h);
-    var r = rng(20260), n = Math.round(w * h / 1800), i;
-    for (i = 0; i < n; i++) {
-      var px = r() * w, py = r() * h, s = r(), a = 0.22 + r() * 0.7;
-      var rad = s > 0.97 ? 1.4 : (s > 0.8 ? 0.95 : 0.55);
-      var tint = r();
-      x.fillStyle = tint > 0.85
-        ? "rgba(185,200,255," + a + ")"
-        : (tint < 0.08 ? "rgba(255,220,195," + a + ")" : "rgba(255,255,255," + a + ")");
-      x.beginPath();
-      x.arc(px, py, rad, 0, 6.2832);
-      x.fill();
-    }
-  }
-  drawStars();
-  var rz;
-  window.addEventListener("resize", function () {
-    clearTimeout(rz);
-    /* keyboard open/close only changes the height; redraw on width change only */
-    rz = setTimeout(function () { if (window.innerWidth !== starW) drawStars(); }, 200);
-  });
 
   /* ---------- shell ---------- */
   function sh(cmd) {
@@ -769,6 +842,8 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
       "  if [ -f $D/$f.txt ]; then printf '%s=' $f; cat $D/$f.txt; else printf '%s=\\n' $f; fi; " +
       "done; " +
       "echo -n 'skip='; [ -f $D/skip.txt ] && cat $D/skip.txt | tr '\\n' '|' || true; echo; " +
+      "echo -n 'bloff='; [ -f $D/bltoff.txt ] && cat $D/bltoff.txt | tr '\\n' '|' || true; echo; " +
+      "echo -n 'bldel='; [ -f $D/bltdel.txt ] && cat $D/bltdel.txt | tr '\\n' '|' || true; echo; " +
       "echo -n 'texg='; [ -f $D/codm_tex.log ] && grep -E '^TEXG ' $D/codm_tex.log | tail -n 200 | tr '\\n' '|' || true; echo; " +
       "echo -n 'ft='; [ -f $D/codm_tex.log ] && grep -E '^FT ' $D/codm_tex.log | tail -n 1 || true; echo; " +
       "echo -n 'ver='; sed -n 's/^version=//p' " + PROP + " 2>/dev/null | head -n 1; echo";
@@ -782,7 +857,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
         var i = ln.indexOf("=");
         if (i < 0) return;
         var k = ln.slice(0, i), v = ln.slice(i + 1);
-        if (k === "skip" || k === "texg") v = v.replace(/\|/g, "\n").replace(/\n$/, "");
+        if (k === "skip" || k === "texg" || k === "bloff" || k === "bldel") v = v.replace(/\|/g, "\n").replace(/\n$/, "");
         s[k] = v.trim();
       });
       return s;
@@ -790,7 +865,11 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   }
 
   function writeFiles(map) {
-    if (demo) return Promise.resolve({ ok: true });
+    Object.keys(map).forEach(function (k) { cur[k] = String(map[k]); });
+    if (demo) {
+      Object.keys(map).forEach(function (k) { fake[k] = String(map[k]); });
+      return Promise.resolve({ ok: true });
+    }
     var parts = [];
     Object.keys(map).forEach(function (k) {
       parts.push("printf '%s\\n' '" + map[k] + "' > $D/" + k + ".txt");
@@ -808,8 +887,9 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   function save(map, label) {
     return writeFiles(map).then(function (r) {
       if (r.ok) {
-        setPend(true);
-        toast((label || "Settings") + " saved. Tap Apply for CODM.");
+        toast(updatePend()
+          ? (label || "Settings") + " saved. Tap Apply for CODM."
+          : "Back to original. Nothing to apply.");
       } else toast("Could not save. Is the game folder present?");
       return r;
     });
@@ -902,113 +982,10 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     return h;
   }
 
-  /* ---------- preview (a procedural sample texture, reduced like mip levels) ---------- */
-  var pvSrc = null, pvCache = {};
-  function pvBuild() {
-    var c = document.createElement("canvas");
-    c.width = c.height = 256;
-    var x = c.getContext("2d"), r = rng(7), i, j, k, px, py;
-    var g = x.createLinearGradient(0, 0, 256, 256);
-    g.addColorStop(0, "#41528f");
-    g.addColorStop(1, "#171d3b");
-    x.fillStyle = g;
-    x.fillRect(0, 0, 256, 256);
-    /* fine speckle: the detail that is lost first */
-    for (i = 0; i < 3200; i++) {
-      x.fillStyle = r() > 0.5 ? "rgba(255,255,255,0.11)" : "rgba(0,0,0,0.2)";
-      x.fillRect((r() * 256) | 0, (r() * 256) | 0, 1, 1);
-    }
-    /* four panels with seams and rivets */
-    var P = [[8, 8], [132, 8], [8, 132], [132, 132]];
-    for (i = 0; i < 4; i++) {
-      px = P[i][0]; py = P[i][1];
-      x.fillStyle = "rgba(8,11,26,0.35)";
-      x.fillRect(px, py, 116, 116);
-      x.strokeStyle = "rgba(8,11,26,0.95)"; x.lineWidth = 2;
-      x.strokeRect(px + 1, py + 1, 114, 114);
-      x.strokeStyle = "rgba(197,208,255,0.22)"; x.lineWidth = 1;
-      x.strokeRect(px + 3.5, py + 3.5, 109, 109);
-      x.fillStyle = "rgba(197,208,255,0.7)";
-      for (j = 0; j < 4; j++) {
-        x.beginPath();
-        x.arc(px + (j % 2 ? 108 : 8), py + (j > 1 ? 108 : 8), 2.2, 0, 6.2832);
-        x.fill();
-      }
-    }
-    /* emblem */
-    x.strokeStyle = "#8fa4ff"; x.lineWidth = 4;
-    x.beginPath(); x.arc(66, 66, 34, 0, 6.2832); x.stroke();
-    x.strokeStyle = "#c5d0ff"; x.lineWidth = 2;
-    x.beginPath(); x.arc(66, 66, 18, 0, 6.2832); x.stroke();
-    x.beginPath(); x.moveTo(66, 24); x.lineTo(66, 108); x.moveTo(24, 66); x.lineTo(108, 66); x.stroke();
-    /* decal lines */
-    var LW = [86, 64, 78, 48, 82, 58, 70];
-    for (k = 0; k < 7; k++) {
-      x.fillStyle = k === 0 ? "#ffd27a" : "rgba(197,208,255,0.8)";
-      x.fillRect(148, 24 + k * 13, k === 0 ? 30 : LW[k], 3);
-    }
-    /* hazard stripes */
-    x.save();
-    x.beginPath(); x.rect(16, 140, 100, 100); x.clip();
-    for (k = -1; k <= 17; k++) {
-      x.fillStyle = k % 2 ? "#ffd27a" : "#1b1f36";
-      x.beginPath();
-      x.moveTo(16 + k * 12, 140);
-      x.lineTo(28 + k * 12, 140);
-      x.lineTo(-72 + k * 12, 240);
-      x.lineTo(-84 + k * 12, 240);
-      x.closePath();
-      x.fill();
-    }
-    x.restore();
-    /* vent grid */
-    for (j = 0; j < 36; j++) {
-      x.fillStyle = "rgba(197,208,255," + (j % 3 ? 0.55 : 0.22) + ")";
-      x.fillRect(146 + (j % 6) * 16, 146 + ((j / 6) | 0) * 16, 10, 10);
-    }
-    return c;
-  }
-  function pvDown(n) {
-    if (n >= 256) return pvSrc;
-    if (pvCache[n]) return pvCache[n];
-    var s = 256, c = pvSrc;
-    while (s > n) {          /* halve step by step, like a mip chain */
-      s >>= 1;
-      var t = document.createElement("canvas");
-      t.width = t.height = s;
-      var x = t.getContext("2d");
-      x.imageSmoothingEnabled = true;
-      x.drawImage(c, 0, 0, s, s);
-      c = t;
-    }
-    pvCache[n] = c;
-    return c;
-  }
-  function pvDraw() {
-    var a = $("pvA"), b = $("pvB");
-    if (!a.getContext) return;
-    if (!pvSrc) {
-      pvSrc = pvBuild();
-      a.getContext("2d").drawImage(pvSrc, 0, 0);
-    }
-    var n = lookMode === 1 ? BLK[strVal]
-      : (lookMode === 2 ? (256 >> strVal) : (lookMode === 3 ? FTGT[strVal] : 256));
-    var bx = b.getContext("2d");
-    bx.clearRect(0, 0, 256, 256);
-    bx.imageSmoothingEnabled = false;
-    bx.drawImage(pvDown(n), 0, 0, 256, 256);
-    var cap = "No look";
-    if (lookMode === 1) cap = "<b>Pixel Blocks</b> · " + BLK[strVal] + " px";
-    else if (lookMode === 2) cap = "<b>Detail Cut</b> · +" + strVal;
-    else if (lookMode === 3) cap = "<b>Flat</b> · +" + strVal;
-    else if (lookMode === 4) cap = "<b>Test Tex</b> · nearest";
-    $("pvBc").innerHTML = cap;
-  }
-
   /* ---------- look + status ---------- */
   function stepItems(m) {
     var a = [], i;
-    if (m === 4) return a;  /* Test Tex: on/off only */
+    if (m === 4) return a;  /* True Pixelated: on/off only */
     if (m === 2 || m === 3) {
       for (i = 1; i <= 4; i++) a.push({ v: i, b: LVN[i], s: "+" + i });
     } else {
@@ -1058,14 +1035,13 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
       $("strD").textContent = "Textures are sampled " + strVal + " mip level" + (strVal === 1 ? "" : "s") + " smaller. Colors stay the same.";
     } else if (lookMode === 3) {
       $("strV").textContent = LVN[strVal];
-      $("strD").textContent = "Experimental. Surfaces become near-solid color. Start low (+1).";
+      $("strD").textContent = "Surfaces become near-solid color. Start low (+1).";
     } else if (lookMode === 4) {
       $("strV").textContent = "On";
-      $("strD").textContent = "Test Tex — nearest sampling only. Full texture data, sharp pixels. Lighting stays.";
+      $("strD").textContent = "True Pixelated — nearest sampling only. Full texture data, sharp pixels. Lighting stays.";
       $("steps").innerHTML = "";
       $("steps").setAttribute("aria-disabled", "true");
     }
-    pvDraw();
     updateStatus();
   }
 
@@ -1075,7 +1051,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     if (lookMode === 1) look = "Pixel Blocks · " + BLK[strVal] + " px";
     else if (lookMode === 2) look = "Detail Cut +" + strVal;
     else if (lookMode === 3) look = "Flat +" + strVal;
-    else if (lookMode === 4) look = "Test Tex";
+    else if (lookMode === 4) look = "True Pixelated";
     $("status").innerHTML =
       '<span class="chip' + (lookMode ? " on" : "") + '"><i></i>' + look + "</span>" +
       '<span class="chip">Scale ' + sc + "%</span>" +
@@ -1093,7 +1069,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
 
   function renderFps() {
     var list = FPS.slice();
-    if (fpsVal > 0 && list.indexOf(fpsVal) < 0) {      /* custom value typed into fps.txt */
+    if (fpsVal > 0 && list.indexOf(fpsVal) < 0) {
       list.push(fpsVal);
       list.sort(function (a, b) { return a - b; });
     }
@@ -1152,7 +1128,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     $("aVer").textContent = s.ver || "—";
     if (s.nodir) {
       $("status").innerHTML = '<span class="chip msg">No settings found yet.</span>';
-      banner("bad", "The game folder is missing. Open CODM once with mode.txt set to 4, then reopen this page.");
+      banner("bad", "The game folder is missing. Open CODM once so the module can create its settings, then reopen this page.");
       return;
     }
     if (s.err) banner("bad", "Could not read settings: " + s.err);
@@ -1197,7 +1173,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     fill($("scale"));
 
     fpsVal = parseInt(s.fps, 10) || 0;
-    if (fpsVal < 20 || fpsVal > 120) fpsVal = 0;     /* same range the module accepts */
+    if (fpsVal < 20 || fpsVal > 120) fpsVal = 0;
     renderFps();
 
     setSw("fz", s.fz !== "0");
@@ -1217,17 +1193,25 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     $("delayV").textContent = di ? (di * 5) + " s" : "Off";
     fill($("delay"));
 
+    cur = fromState(s);
     if (!demo && (parseInt(s.bias, 10) || 0) > 0) writeFiles({ bias: 0 });
     if (!demo && s.near !== "1") writeFiles({ near: 1 });
     if (!demo && s.sedge !== "1") writeFiles({ sedge: 1 });
 
+    blOff = {}; blDel = {};
+    (s.bloff || "").split("\n").forEach(function (l) { l = l.trim().replace(/\s+/g, " "); if (l) blOff[l] = 1; });
+    (s.bldel || "").split("\n").forEach(function (l) { l = l.trim().replace(/\s+/g, " "); if (l) blDel[l] = 1; });
     parseGroups(s.skip || "", s.texg || "");
+    cur.skip = nl(skipLines()); cur.bloff = nk(blOff); cur.bldel = nk(blDel);
+    if (!base) setBaseline();
+    updatePend();
     renderGroups();
+    renderSkipList();
     updateLookUI();
     renderStats(s.ft);
   }
 
-  /* ---------- texture groups ---------- */
+  /* ---------- texture groups & skip manager ---------- */
   function fmtName(f) {
     var e = {
       0x9270: "R11 EAC", 0x9271: "R11 EAC signed", 0x9272: "RG11 EAC", 0x9273: "RG11 EAC signed",
@@ -1240,24 +1224,33 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     if (f >= 0x93d0 && f <= 0x93dd) return "ASTC " + A[f - 0x93d0] + " sRGB";
     return "Format 0x" + f.toString(16);
   }
+  
   function parseGroups(skipText, texgText) {
     var map = {}, m, re = /fmt=(\d+)\s+hex=\S+\s+sz=(\d+)\s+n=(\d+)\s+ap=(\d+)/;
     skipSet = {};
-    extraSkip = [];
+    customSkips = [];
+    
     skipText.split("\n").forEach(function (l) {
-      m = /^\s*(\d+)\s+(\d+)\s*$/.exec(l);
-      if (!m) {
-        if (/^\s*\d+\s+\d+\s+\d+\s*$/.test(l)) extraSkip.push(l.trim().replace(/\s+/g, " "));
-        return;
+      l = l.trim();
+      if (!l) return;
+      var active = true;
+      if (l.startsWith("#")) {
+        active = false;
+        l = l.substring(1).trim();
       }
-      if (m[2] === "0") extraSkip.push(l.trim());
-      else skipSet[m[1] + "|" + m[2]] = 1;
+      m = /^\s*(\d+)\s+(\d+)\s*$/.exec(l);
+      if (m && active) {
+        if (m[2] !== "0") skipSet[m[1] + "|" + m[2]] = 1;
+      }
+      customSkips.push({ line: l, active: active });
     });
-    texgText.split("\n").forEach(function (l) {   /* later (newer) lines overwrite earlier ones */
+    
+    texgText.split("\n").forEach(function (l) {
       m = re.exec(l);
       if (!m) return;
       map[m[1] + "|" + m[2]] = { fmt: +m[1], sz: +m[2], n: +m[3], ap: +m[4] };
     });
+    
     Object.keys(skipSet).forEach(function (k) {
       if (!map[k]) {
         var a = k.split("|");
@@ -1267,14 +1260,31 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     groups = Object.keys(map).map(function (k) { return map[k]; });
     groups.sort(function (a, b) { return b.sz - a.sz || b.n - a.n; });
   }
+
   function skipLines() {
-    var lines = extraSkip.slice();
-    Object.keys(skipSet).forEach(function (k) { lines.push(k.replace("|", " ")); });
+    var lines = [];
+    var seen = {};
+    
+    customSkips.forEach(function(cs) {
+      var out = cs.active ? cs.line : ("# " + cs.line);
+      lines.push(out);
+      if (cs.active) seen[cs.line] = true;
+    });
+    
+    Object.keys(skipSet).forEach(function(k) {
+      var line = k.replace("|", " ");
+      if (!seen[line]) {
+        lines.push(line);
+        seen[line] = true;
+      }
+    });
     return lines;
   }
-  function writeSkip() {
-    var lines = skipLines();
-    if (demo) return Promise.resolve({ ok: true });
+
+  function writeSkip(linesIn) {
+    var lines = linesIn || skipLines();
+    cur.skip = nl(lines);
+    if (demo) { fake.skip = lines.join("\n"); return Promise.resolve({ ok: true }); }
     var cmd = "D=" + D + "; [ -d $D ] || { echo NODIR; exit 1; }; ";
     cmd += lines.length
       ? ("printf '%s\\n' " + lines.map(function (l) { return '"' + l + '"'; }).join(" ") + " > $D/skip.txt; ")
@@ -1287,13 +1297,37 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
       });
     });
   }
-  function syncSkipText() { $("skipt").value = skipLines().join("\n"); }
-  function skipDone(r) {
-    if (r.ok) setPend(true);
-    toast(r.ok ? "List saved. Tap Apply for CODM." : "Could not save the list.");
+
+  function writeBl() {
+    cur.bloff = nk(blOff); cur.bldel = nk(blDel);
+    if (demo) {
+      fake.bloff = Object.keys(blOff).join("\n"); fake.bldel = Object.keys(blDel).join("\n");
+      return Promise.resolve({ ok: true });
+    }
+    function one(file, obj) {
+      var a = Object.keys(obj);
+      return a.length
+        ? "printf '%s\\n' " + a.map(function (l) { return '"' + l + '"'; }).join(" ") + " > $D/" + file + "; "
+        : ": > $D/" + file + "; ";
+    }
+    var cmd = "D=" + D + "; [ -d $D ] || { echo NODIR; exit 1; }; " +
+      one("bltoff.txt", blOff) + one("bltdel.txt", blDel) +
+      "chmod 666 $D/bltoff.txt $D/bltdel.txt 2>/dev/null; echo OK";
+    return queued(function () {
+      return sh(cmd).then(function (r) {
+        r.ok = r.stdout.indexOf("OK") >= 0;
+        return r;
+      });
+    });
   }
+
+  function skipDone(r) {
+    var p = r.ok && updatePend();
+    toast(!r.ok ? "Could not save the list."
+      : (p ? "List saved. Tap Apply for CODM." : "Back to original. Nothing to apply."));
+  }
+
   function renderGroups() {
-    syncSkipText();
     var box = $("groups"), cnt = $("gcount");
     if (!groups.length) {
       cnt.hidden = true;
@@ -1313,6 +1347,40 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     cnt.hidden = false;
     cnt.textContent = groups.length + " group" + (groups.length === 1 ? "" : "s") + (off ? " · " + off + " off" : "");
   }
+
+  function renderSkipList() {
+    var html = "";
+    var TRASH = '<svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>';
+    var nDel = 0;
+    builtins.forEach(function(b) {
+      if (blDel[b]) { nDel++; return; }
+      var on = !blOff[b];
+      html += '<div class="skip-item builtin' + (on ? '' : ' off') + '">' +
+        '<div class="skip-info"><span>' + b + '</span><small>Built-in' + (on ? '' : ' (off)') + '</small></div>' +
+        '<div class="skip-actions">' +
+          '<button class="sw bl-toggle" data-k="' + b + '" aria-checked="' + (on ? "true" : "false") + '"><span class="knob"></span></button>' +
+          '<button class="ib skip-del bl-del" data-k="' + b + '" aria-label="Delete">' + TRASH + '</button>' +
+        '</div></div>';
+    });
+    if (nDel) {
+      html += '<button class="btn bl-restore" type="button" style="margin-top:4px">Restore deleted built-ins (' + nDel + ')</button>';
+    }
+
+    customSkips.forEach(function(cs, i) {
+      html += '<div class="skip-item">' +
+        '<div class="skip-info"><span>' + esc(cs.line) + '</span></div>' +
+        '<div class="skip-actions">' +
+          '<button class="sw skip-toggle" data-idx="' + i + '" aria-checked="' + (cs.active ? "true" : "false") + '"><span class="knob"></span></button>' +
+          '<button class="ib skip-del" data-idx="' + i + '" aria-label="Delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>' +
+        '</div></div>';
+    });
+    
+    if (customSkips.length === 0) {
+      html += '<p class="desc" style="text-align:center; margin-top:8px;">No custom rules added yet.</p>';
+    }
+    $("skipList").innerHTML = html;
+  }
+
   $("groups").addEventListener("click", function (e) {
     var b = e.target.closest ? e.target.closest(".sw") : null;
     if (!b) return;
@@ -1320,10 +1388,100 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     if (skipSet[key]) delete skipSet[key];
     else skipSet[key] = 1;
     b.setAttribute("aria-checked", skipSet[key] ? "false" : "true");
-    syncSkipText();
     var off = Object.keys(skipSet).length;
     $("gcount").textContent = groups.length + " group" + (groups.length === 1 ? "" : "s") + (off ? " · " + off + " off" : "");
     writeSkip().then(skipDone);
+  });
+
+  $("skipAdd").addEventListener("click", function () {
+    var lines = $("skipt").value.split("\n");
+    var added = 0;
+    lines.forEach(function(l) {
+      l = l.trim();
+      if (l) {
+        var exists = customSkips.some(function(cs) { return cs.line === l; });
+        if (!exists) {
+          customSkips.push({ line: l, active: true });
+          added++;
+        }
+      }
+    });
+    if (added > 0) {
+      $("skipt").value = "";
+      renderSkipList();
+      writeSkip().then(function(r) {
+        if (r.ok) updatePend();
+        toast("Added " + added + " rule(s). Tap Apply for CODM.");
+      });
+    } else {
+      toast("No new valid rules found.");
+    }
+  });
+
+  $("skipList").addEventListener("click", function(e) {
+    var blr = e.target.closest(".bl-restore");
+    if (blr) {
+      Object.keys(blDel).forEach(function (k) { delete blOff[k]; });
+      blDel = {};
+      renderSkipList();
+      writeBl().then(skipDone);
+      return;
+    }
+    var bld = e.target.closest(".bl-del");
+    if (bld) {
+      var bk = bld.getAttribute("data-k");
+      if (bld.classList.contains("confirm")) {
+        blOff[bk] = 1; blDel[bk] = 1;
+        renderSkipList();
+        writeBl().then(skipDone);
+      } else {
+        bld.classList.add("confirm");
+        bld.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+        toast("Tap the check again to delete this built-in.");
+        setTimeout(function () {
+          if (bld && $("skipList").contains(bld) && bld.classList.contains("confirm")) {
+            bld.classList.remove("confirm");
+            bld.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>';
+          }
+        }, 2500);
+      }
+      return;
+    }
+    var blt = e.target.closest(".bl-toggle");
+    if (blt) {
+      var tk = blt.getAttribute("data-k");
+      if (blOff[tk]) delete blOff[tk]; else blOff[tk] = 1;
+      renderSkipList();
+      writeBl().then(skipDone);
+      return;
+    }
+    var delBtn = e.target.closest(".skip-del");
+    if (delBtn) {
+      var idx = delBtn.getAttribute("data-idx");
+      if (delBtn.classList.contains("confirm")) {
+        customSkips.splice(idx, 1);
+        renderSkipList();
+        writeSkip().then(skipDone);
+      } else {
+        delBtn.classList.add("confirm");
+        delBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+        setTimeout(function() {
+          if (delBtn && $("skipList").contains(delBtn)) {
+            delBtn.classList.remove("confirm");
+            delBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>';
+          }
+        }, 2000);
+      }
+      return;
+    }
+    
+    var toggleBtn = e.target.closest(".skip-toggle");
+    if (toggleBtn) {
+      var tidx = toggleBtn.getAttribute("data-idx");
+      customSkips[tidx].active = !customSkips[tidx].active;
+      renderSkipList();
+      writeSkip().then(skipDone);
+    }
   });
 
   function refresh() { return readState().then(render); }
@@ -1384,33 +1542,6 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     save({ delay: parseInt($("delay").value, 10) * 5 }, "Start delay");
   });
 
-  $("skips").addEventListener("click", function () {
-    var ok = [], bad = 0;
-    $("skipt").value.split("\n").forEach(function (l) {
-      l = l.trim();
-      if (!l) return;
-      if (/^\d+(\s+\d+){1,2}$/.test(l)) ok.push(l.replace(/\s+/g, " "));
-      else bad++;
-    });
-    skipSet = {};
-    extraSkip = [];
-    ok.forEach(function (l) {
-      var p = l.split(" ");
-      if (p.length === 2 && p[1] !== "0") skipSet[p[0] + "|" + p[1]] = 1;
-      else extraSkip.push(l);
-    });
-    writeSkip().then(function (r) {
-      renderGroups();
-      if (r.ok) setPend(true);
-      toast(r.ok
-        ? ("Saved " + ok.length + " line" + (ok.length === 1 ? "" : "s") +
-           (bad ? ", ignored " + bad : "") + ". Tap Apply for CODM.")
-        : "Could not save the list.");
-    });
-  });
-  $("skipr").addEventListener("click", function () {
-    refresh().then(function () { toast("List reloaded."); });
-  });
   $("gref").addEventListener("click", function () {
     refresh().then(function () { toast("Groups refreshed."); });
   });
@@ -1419,11 +1550,9 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   });
   $("gall").addEventListener("click", function () {
     skipSet = {};
-    extraSkip = [];
     writeSkip().then(function (r) {
       renderGroups();
       skipDone(r);
-      if (r.ok) toast("All groups on. Tap Apply for CODM.");
     });
   });
 
@@ -1438,9 +1567,22 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     });
   });
 
+  function cancelChanges() {
+    var map = {}, n = 0;
+    KEYS.forEach(function (k) { if (cur[k] !== base[k]) { map[k] = base[k]; n++; } });
+    blOff = Object.assign({}, baseBlOff);
+    blDel = Object.assign({}, baseBlDel);
+    var p = n ? writeFiles(map) : Promise.resolve({ ok: true });
+    p.then(function () { return writeSkip(baseSkipLines); })
+     .then(function () { return writeBl(); })
+     .then(function () { return refresh(); })
+     .then(function () { updatePend(); toast("Changes cancelled. Back to the original settings."); });
+  }
+  $("cancelChg").addEventListener("click", function () { if (base) cancelChanges(); });
+
   $("stop").addEventListener("click", function () {
     sh("am force-stop " + PKG).then(function (r) {
-      if (demo || r.errno === 0) setPend(false);
+      if (demo || r.errno === 0) { setBaseline(); updatePend(); }
       toast(demo
         ? "Demo mode — nothing was stopped."
         : (r.errno === 0 ? "CODM stopped. Open it again to apply." : "Could not stop CODM."));
@@ -1540,11 +1682,15 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     $("logw").classList.remove("open");
     unlockScroll();
   });
+  arm("normal", "Tap again to turn all off", function () {
+    save(NORMAL, "All effects off").then(refresh);
+  });
   arm("reset", "Tap again to reset", function () {
     save(REC, "Defaults").then(function () {
       skipSet = {};
-      extraSkip = [];
-      return writeSkip();
+      customSkips = [];
+      blOff = {}; blDel = {};
+      return writeSkip().then(writeBl);
     }).then(refresh);
   });
 
@@ -1561,11 +1707,11 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     function frac() { return (el.value - el.min) / (el.max - el.min); }
     function center() {
       var r = el.getBoundingClientRect();
-      return r.left + 12 + frac() * (r.width - 24);
+      return r.left + 14 + frac() * (r.width - 28);
     }
     function move(e) {
       var r = el.getBoundingClientRect(), mn = +el.min, mx = +el.max, st = +el.step || 1;
-      var f = (e.clientX - off - r.left - 12) / (r.width - 24);
+      var f = (e.clientX - off - r.left - 14) / (r.width - 28);
       f = Math.max(0, Math.min(1, f));
       var v = mn + Math.round(f * (mx - mn) / st) * st;
       if (String(v) !== el.value) {
