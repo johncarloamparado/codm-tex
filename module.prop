@@ -3,4 +3,4 @@ name=CODM Blocky Textures
 version=v0.24
 versionCode=25
 author=Q9 Papyrus
-description=Pixel Blocks, Detail Cut, Flat, and True Pixelated looks for CODM, with WebUI and frame logger.
+description=Texture filtering, render scale and frame-time diagnostics for Call of Duty: Mobile. Includes a WebUI for SukiSU Ultra.

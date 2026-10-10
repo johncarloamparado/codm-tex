@@ -1,3 +1,15 @@
+/*
+ * codm_tex - Zygisk module for Call of Duty: Mobile
+ *
+ * Installs PLT hooks (LSPlt) on the Unity renderer (libunity.so) to:
+ *   - change texture sampling (Pixel Blocks, Detail Cut, Flat, True Pixelated)
+ *   - lower the render resolution (render scale) and cap the frame rate
+ *   - record frame-time, freeze, thread and CPU-core diagnostics
+ *
+ * Settings are plain text files in the game's data directory (see the *F
+ * macros below). They are read once at launch and are edited through the
+ * WebUI in webroot/ (SukiSU Ultra / KernelSU).
+ */
 #include <cstdarg>
 #include <cerrno>
 #include <jni.h>
@@ -67,8 +79,8 @@ static void L(const char *fmt, ...) {
     fflush(lf);
 }
 
-/* ---------- Stage 2: mip bias ---------- */
-static std::atomic<int> g_scale{0};        /* 0 = off; 20-99 = % of native resolution */
+/* ---------- Render scale and mip bias ---------- */
+static std::atomic<int> g_scale{0};        /* 0 = off, 20-99 = percent of native resolution */
 static std::atomic<int> g_bias{0};
 static std::atomic<int> g_applied{0};
 static void (*real_tp)(GLenum, GLenum, GLint) = nullptr;
@@ -77,14 +89,15 @@ static bool is_cmp(GLenum f) {
     return (f >= 0x9270 && f <= 0x9279) || (f >= 0x93b0 && f <= 0x93dd);
 }
 
-/* ---------- Stage 8: blocky texture (near.txt) ---------- */
-/* near.txt: 0 = off | 1 = on (default). Only matters when block/bias path is active.
-   Flagged textures are forced to NEAREST filtering = mosaic blocks. */
+/* ---------- Pixel Blocks (near.txt, blk.txt) ---------- */
+/* near.txt: 0 = off, 1 = on (default). Only used by the Pixel Blocks path.
+   Textures that get a raised base level are also switched to NEAREST
+   filtering, which is what produces the mosaic look. */
 static std::atomic<int> g_near{1};
-static std::atomic<int> g_blk{0};       /* blk.txt: target size (px) per texture; 0 = use bias.txt */
+static std::atomic<int> g_blk{0};       /* blk.txt: target edge length in px per texture; 0 = fall back to bias.txt */
 static std::atomic<int> g_flagged{0}, g_forced{0}, g_smp{0};
 static const GLuint MAXTEX = 1u << 18;
-static std::atomic<uint8_t> g_tf[1u << 18];        /* 1 = texture forced to NEAREST */
+static std::atomic<uint8_t> g_tf[1u << 18];        /* 1 = NEAREST filtering is forced on this texture */
 static thread_local GLuint tl_bound[32];
 static thread_local int tl_unit = 0;
 
@@ -112,14 +125,15 @@ static void h_del(GLsizei n, const GLuint *ids) {
     if (o_del) o_del(n, ids);
 }
 
-/* ---------- v16: Detail Cut (style.txt = 0 off | 1..4 = min LOD; sedge.txt = 1 -> sharp MAG edges) ---------- */
-/* ---------- v19: Flat Color (flat.txt = 0 off | 1..4 = strength). Locks texture to tiny mips = near-solid color. */
+/* ---------- Detail Cut (style.txt: 0 = off, 1-4 = minimum LOD; sedge.txt: 1 = NEAREST magnification) ---------- */
+/* ---------- Flat (flat.txt: 0 = off, 1-4 = strength) ----------
+   Locks a texture to its smallest mip levels so it renders as a near-solid color. */
 static std::atomic<int> g_style{0};
 static std::atomic<int> g_sedge{1};
 static std::atomic<int> g_flat{0};
-static std::atomic<int> g_ttsize{0};   /* ttsize.txt: -2 finer (mip0 only, shimmer) | -1 fine (mips capped at level 3) | 0 normal | 1..3 bigger pixels (2x,4x,8x) */
-static std::atomic<int> g_ttsm{0};     /* ttsm.txt: 0 sharp | 1 soft mip blend */
-static std::atomic<int> g_testtex{1};  /* testtex.txt: 0 off | 1 = Test Tex (NEAREST only, full mips) */
+static std::atomic<int> g_ttsize{0};   /* ttsize.txt: -2 = base level only (shimmers) | -1 = mips capped at level 3 | 0 = normal | 1-3 = coarser pixels (2x, 4x, 8x) */
+static std::atomic<int> g_ttsm{0};     /* ttsm.txt: 0 = sharp | 1 = soft blend between mip levels */
+static std::atomic<int> g_testtex{1};  /* testtex.txt: 0 = off | 1 = True Pixelated (NEAREST sampling, full mip chain) */
 #define TEX_MIN_LOD 0x813A
 #define TEX_MAX_LEVEL 0x813D
 #define TEX_ANISO 0x84FE
@@ -133,7 +147,7 @@ static std::atomic<int> g_testtex{1};  /* testtex.txt: 0 off | 1 = Test Tex (NEA
 #ifndef GL_LINEAR_MIPMAP_NEAREST
 #define GL_LINEAR_MIPMAP_NEAREST 0x2701
 #endif
-/* Test Tex filters from ttsize / ttsm */
+/* Min/mag filters for True Pixelated, derived from ttsize and ttsm */
 static void tt_filters(GLint &mn, GLint &mg) {
     int sz = g_ttsize.load(), sm = g_ttsm.load();
     bool nomip = sz <= -2;
@@ -150,16 +164,16 @@ static void h_tp(GLenum t, GLenum p, GLint v) {
         GLuint id = tl_bound[tl_unit];
         if (id > 0 && id < MAXTEX && g_tf[id].load()) {
             if (tt > 0) {
-                /* Test Tex: sharp texels, keep full resolution mips */
+                /* True Pixelated: sharp texels, keep the full-resolution mip chain */
                 GLint mn, mg; tt_filters(mn, mg);
                 v = (p == GL_TEXTURE_MAG_FILTER) ? mg : mn;
                 g_forced++;
             } else if (fl > 0) {
-                /* Flat: both filters NEAREST so the tiny mip stays solid */
+                /* Flat: NEAREST for both filters so the small mip stays a solid color */
                 v = GL_NEAREST;
                 g_forced++;
             } else if (st > 0) {
-                /* Detail Cut: MAG only */
+                /* Detail Cut: only the magnification filter is changed */
                 if (p == GL_TEXTURE_MAG_FILTER) { v = GL_NEAREST; g_forced++; }
             } else {
                 v = GL_NEAREST;
@@ -182,14 +196,14 @@ static void h_smp(GLuint s, GLenum p, GLint v) {
     if (o_smp) o_smp(s, p, v);
 }
 
-/* ---------- Stage 9: texture groups, skip list, min size, start delay ---------- */
+/* ---------- Texture groups, skip rules, minimum size, start delay ---------- */
 static inline int64_t now_ns();
-static std::atomic<int> g_minsz{64};                 /* minsz.txt: smaller than this = leave untouched */
-static std::atomic<int> g_delay{20};                  /* delay.txt: seconds after launch with no texture changes */
+static std::atomic<int> g_minsz{64};                 /* minsz.txt: textures smaller than this are left untouched */
+static std::atomic<int> g_delay{20};                  /* delay.txt: seconds after launch during which no textures are modified */
 static std::atomic<int64_t> g_tstart{0};
 struct Sk { int fmt, a, b; };
-static std::vector<Sk> g_bloff;                      /* bltoff.txt: built-in skips turned off from the WebUI; read at startup only */
-static std::vector<Sk> g_skip;                       /* skip.txt: "fmt size" (size 0 = all) or "fmt w h"; read at startup only */
+static std::vector<Sk> g_bloff;                      /* bltoff.txt: built-in skip rules disabled from the WebUI; read once at startup */
+static std::vector<Sk> g_skip;                       /* skip.txt: "fmt size" (size 0 = any) or "fmt w h"; read once at startup */
 struct Grp { int fmt; int sz; int n; int ap; };
 static const int MAXG = 96;
 static Grp g_grp[MAXG];
@@ -204,9 +218,10 @@ static void grp_note(int fmt, int sz, bool applied) {
     if (g_ng < MAXG) { g_grp[g_ng].fmt = fmt; g_grp[g_ng].sz = sz; g_grp[g_ng].n = 1; g_grp[g_ng].ap = applied ? 1 : 0; g_ng++; g_gdirty = 1; }
 }
 
-/* Default skips (compiled in; can be turned off per line with bltoff.txt from the WebUI).
-   37497 256x512 = Lava Remix scope/reticle atlas.
-   37493/37492/37497 128x128 = partial character-detail protection. */
+/* Built-in skip rules, compiled in. Each one can be switched off through
+   bltoff.txt, which the WebUI manages.
+   37497 256x512                  scope / reticle atlas (Lava Remix)
+   37493, 37492, 37497 128x128    small character-detail textures */
 static const Sk g_builtin[] = {
     {37497, 256, 512},
     {37493, 128, 128},
@@ -231,7 +246,8 @@ static bool in_skip(int fmt, int w, int h) {
     return false;
 }
 
-/* v17: TEXN = every created texture (phone time) — compare two logs to identify scopes/reddots */
+/* TEXN: one log line per created texture, stamped with the wall-clock time.
+   Comparing two logs makes it easy to pick out scopes and red-dot sights. */
 static std::atomic<int> g_texn{0};
 static void texn_log(int w, int h, int lv, int fmt, bool cand) {
     int n = ++g_texn;
@@ -365,22 +381,22 @@ static void grp_dump(double t_s) {
         L("TEXG t=%.0f fmt=%d hex=0x%x sz=%d n=%d ap=%d\n", t_s, tmp[i].fmt, tmp[i].fmt, tmp[i].sz, tmp[i].n, tmp[i].ap);
 }
 
-/* ---------- Stage 3: frame-time logger + FPS cap ---------- */
-static std::atomic<int> g_fps{0};          /* 0 = no cap, logger only */
-static std::atomic<pid_t> g_rt{0};         /* render thread (first caller of swap) */
+/* ---------- Frame-time logger and FPS cap ---------- */
+static std::atomic<int> g_fps{0};          /* 0 = no cap (logging only) */
+static std::atomic<pid_t> g_rt{0};         /* render thread (first thread to call eglSwapBuffers) */
 
 static inline int64_t now_ns() {
     timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
-/* ---------- Stage 5: freeze logger (logging only, does not change gameplay) ---------- */
-/* fz.txt: 0 = off (no extra hooks) | 1 = on (default) */
+/* ---------- Freeze logger (diagnostics only, no effect on gameplay) ---------- */
+/* fz.txt: 0 = off (no extra hooks installed), 1 = on (default) */
 static std::atomic<int> g_fz{1};
-static std::atomic<int64_t> g_t0{0};       /* module start time for timestamps */
+static std::atomic<int64_t> g_t0{0};       /* time of the first rendered frame; log timestamps are relative to it */
 
 enum { K_COMP, K_LINK, K_PBIN, K_BUF, K_TEX, K_N };
-static std::atomic<int> c_cnt[2][K_N];     /* [0] = render thread, [1] = ibang thread */
+static std::atomic<int> c_cnt[2][K_N];     /* [0] = render thread, [1] = all other threads */
 static std::atomic<int64_t> c_ns[2][K_N];
 
 static thread_local pid_t tl_tid = 0;
@@ -434,20 +450,20 @@ static void h_ts3(GLenum t, GLsizei lv, GLenum f, GLsizei w, GLsizei h, GLsizei 
     if (!o_ts3) return; TIMED(K_TEX, o_ts3(t, lv, f, w, h, d));
 }
 
-/* ---------- Stage 6: per-thread CPU (alin ang busy habang may freeze) ---------- */
-/* th.txt: 0 = off | 1 = on (default). No new thread; only the render thread reads /proc. */
+/* ---------- Per-thread CPU usage (shows which threads were busy during a freeze) ---------- */
+/* th.txt: 0 = off, 1 = on (default). Runs on the render thread; no extra thread is created. */
 static std::atomic<int> g_th{1};
-static int g_sched_mode = -1;              /* 1 = schedstat (ns) | 0 = stat (ticks) */
+static int g_sched_mode = -1;              /* 1 = /proc schedstat (ns), 0 = /proc stat (ticks) */
 struct Thr { pid_t tid; int fd; int64_t prev, cur, wprev, wcur; char name[20]; };
-static std::vector<Thr> g_thr;             /* only the render thread handles this */
+static std::vector<Thr> g_thr;             /* only accessed from the render thread */
 static int g_nthr = 0;
 static const size_t MAXT = 48;
 
-/* ---------- Stage 7: core logger (logging lang) ---------- */
-/* core.txt: 0 = off | 1 = on (default). Only works when fz.txt = 1 at th.txt = 1. */
+/* ---------- CPU core logger (diagnostics only) ---------- */
+/* core.txt: 0 = off, 1 = on (default). Requires fz.txt = 1 and th.txt = 1. */
 static std::atomic<int> g_core{1};
 static const int NC = 8;
-static std::vector<std::pair<pid_t, int>> g_um;    /* UnityMain: tid, fd ng stat */
+static std::vector<std::pair<pid_t, int>> g_um;    /* UnityMain threads: tid and an open fd on /proc/self/task/<tid>/stat */
 static int g_um_now = -1, g_um_prev = -1;
 static int g_h_um[NC], g_h_rt[NC], g_h_fz[NC];
 static int g_h_n = 0;
@@ -469,7 +485,7 @@ static int cpu_khz(int c) {
     return read_int_file(p);
 }
 
-/* field 39 ("processor") ng /proc/.../stat = huling core na tinakbuhan */
+/* Field 39 ("processor") of /proc/.../stat is the CPU the thread last ran on. */
 static int core_of(int fd) {
     char b[640];
     ssize_t n = pread(fd, b, sizeof(b) - 1, 0);
@@ -679,7 +695,7 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     pid_t tid = (pid_t)syscall(SYS_gettid);
     pid_t exp = 0;
     g_rt.compare_exchange_strong(exp, tid);
-    if (g_rt.load() != tid) return r;       /* other thread: leave alone */
+    if (g_rt.load() != tid) return r;       /* not the render thread: nothing to do */
 
     static int64_t last = 0;                /* time of previous frame (after cap) */
     static int64_t deadline = 0;            /* when the current frame should finish */
@@ -687,7 +703,7 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     static std::vector<float> ft;           /* frame times (ms) in a 5-second window */
     static int64_t frame_no = 0;
     static int win_fz = 0;                  /* freeze count in the stats window */
-    static int fz_logged = 0;               /* FREEZE line limit per session */
+    static int fz_logged = 0;               /* cap on FREEZE log lines per session */
     static rusage ru_last;
     static bool ru_ok = false;
     static int64_t next_scan = 0;
@@ -716,7 +732,7 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     float ms = 0.f;
     if (last != 0) {
         ms = (float)((t - last) / 1e6);
-        if (ms < 1000.f) ft.push_back(ms);           /* skip loading pauses in stats */
+        if (ms < 1000.f) ft.push_back(ms);           /* ignore loading pauses in the statistics */
     }
     last = t;
     if (win_start == 0) win_start = t;
@@ -785,8 +801,8 @@ static EGLBoolean h_swap(EGLDisplay d, EGLSurface s) {
     return r;
 }
 
-/* ---------- Stage 4: render scale (shrink the window buffer) ---------- */
-static std::atomic<int> g_fullw{1600}, g_fullh{720};   /* seed: device native; only grows, never shrinks */
+/* ---------- Render scale (shrinks the window buffer) ---------- */
+static std::atomic<int> g_fullw{1600}, g_fullh{720};   /* initial guess of the native size; only ever grows */
 static std::atomic<int> g_sbgn{0};
 
 static EGLSurface (*o_cws)(EGLDisplay, EGLConfig, EGLNativeWindowType, const EGLint *) = nullptr;
@@ -1031,9 +1047,14 @@ static void load_cfg() {
     }
 }
 
-/* mode.txt: 0 = idle | 1 = thread only | 2 = thread + find libunity (no hooks) | 3 = full hooks (polling) | 4 = hook at libunity load (no poll thread) */
+/* mode.txt:
+     0 = idle
+     1 = background thread only
+     2 = thread + locate libunity (no hooks)
+     3 = full hooks, installed by polling
+     4 = hook libunity as soon as it loads (no polling thread) */
 static int read_mode() {
-    int v = 4;                                   /* no mode.txt yet = active (4) */
+    int v = 4;                                   /* no mode.txt yet: default to active mode (4) */
     FILE *f = fopen(MODEF, "r");
     if (f) {
         if (fscanf(f, "%d", &v) != 1) v = 0;
@@ -1045,7 +1066,7 @@ static int read_mode() {
     return std::max(0, std::min(v, 4));
 }
 
-/* Register all hooks on one libunity mapping */
+/* Register every hook on a single libunity mapping */
 static void reg_hooks(dev_t dv, ino_t in) {
     lsplt::RegisterHook(dv, in, "dlsym", (void *)h_dlsym, (void **)&o_dlsym);
     lsplt::RegisterHook(dv, in, "eglGetProcAddress", (void *)h_egl, (void **)&o_egl);
@@ -1074,7 +1095,7 @@ static void reg_hooks(dev_t dv, ino_t in) {
     }
 }
 
-/* ---------- Mode 4: hook libunity only briefly right after it loads ---------- */
+/* ---------- Mode 4: hook libunity right after it is loaded ---------- */
 static std::atomic<bool> g_hooked{false};
 static void *(*o_adle)(const char *, int, const android_dlextinfo *) = nullptr;
 
@@ -1133,7 +1154,7 @@ static void run(int mode) {
                 if (done.count(key)) continue;
                 auto it = first.find(key);
                 if (it == first.end()) { first[key] = now_ns(); L("SEEN libunity i=%d\n", i); continue; }
-                if (now_ns() - it->second < 3000000000LL) continue;   /* wait until loading finishes */
+                if (now_ns() - it->second < 3000000000LL) continue;   /* give libunity time to finish loading */
                 done.insert(key);
                 if (mode == 2) { L("mode2: stable, no hooks\n"); continue; }
                 reg_hooks(m.dev, m.inode);
