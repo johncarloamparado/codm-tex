@@ -1,6 +1,6 @@
 id=codm_tex_logger
 name=CODM Blocky Textures
-version=v0.20
-versionCode=21
+version=v0.24
+versionCode=25
 author=Q9 Papyrus
-description=Pixel Blocks, Detail Cut, and Flat Color texture looks for CODM, with loggers for testing purposes.(PLS USE ALT ACCOUNT IF IT'S THE FIRST TIME YOU'RE TRYING THIS MODULE FOR CODM).
+description=Pixel Blocks, Detail Cut, Flat, and Test Tex (true pixel) looks for CODM, with WebUI and frame logger.

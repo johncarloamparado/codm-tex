@@ -381,7 +381,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   <!-- ========== HOME ========== -->
   <div class="view active" id="v-home">
     <section class="card">
-      <div class="ch"><h2>Look</h2><span class="tag">Flat is experimental</span></div>
+      <div class="ch"><h2>Look</h2><span class="tag">Test Tex is experimental</span></div>
       <p class="cap">Choose one look. Turning one on turns the others off.</p>
 
       <div class="modes" id="lookSeg" role="radiogroup" aria-label="Look mode">
@@ -401,6 +401,10 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
           <span class="mt"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5"/></svg><b>Flat</b></span>
           <small>Near-solid colors</small>
         </button>
+        <button type="button" class="mode" role="radio" aria-checked="false" data-m="4">
+          <span class="mt"><svg viewBox="0 0 24 24"><path d="M4 4h4v4H4zM10 4h4v4h-4zM16 4h4v4h-4zM4 10h4v4H4zM10 10h4v4h-4zM16 10h4v4h-4zM4 16h4v4H4zM10 16h4v4h-4zM16 16h4v4h-4z"/></svg><b>Test Tex</b></span>
+          <small>True pixel (experimental)</small>
+        </button>
       </div>
 
       <div class="pv" aria-hidden="true">
@@ -409,10 +413,20 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
       </div>
       <p class="pnote">Sample texture, approximate. Real results depend on each texture's size.</p>
 
-      <div class="row">
+      <div class="row" id="strRow">
         <div class="rh"><span class="lb" id="strL">Strength</span><span class="val" id="strV">—</span></div>
         <p class="desc" id="strD">Pick a look above first.</p>
         <div class="steps" id="steps" role="radiogroup" aria-labelledby="strL"></div>
+      </div>
+      <div class="row" id="ttSzRow" style="display:none">
+        <div class="rh"><span class="lb" id="ttszL">Pixel size</span><span class="val" id="ttszV">Normal</span></div>
+        <p class="desc" id="ttszD"></p>
+        <div class="steps" id="ttszBox" role="radiogroup" aria-labelledby="ttszL" style="--n:6"></div>
+      </div>
+      <div class="row" id="ttSmRow" style="display:none">
+        <div class="rh"><span class="lb" id="ttsmL">Edge blend</span><span class="val" id="ttsmV">Sharp</span></div>
+        <p class="desc" id="ttsmD"></p>
+        <div class="steps" id="ttsmBox" role="radiogroup" aria-labelledby="ttsmL" style="--n:2"></div>
       </div>
     </section>
 
@@ -606,20 +620,31 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   var REC = {
     blk: 0, bias: 0, near: 1, scale: 0, fps: 0,
     fz: 1, th: 1, core: 1, mode: 4,
-    minsz: 64, delay: 0, style: 0, sedge: 1, flat: 0
+    minsz: 64, delay: 0, style: 0, sedge: 1, flat: 0, testtex: 0, ttsize: 0, ttsm: 0
   };
 
   var demo = (typeof ksu === "undefined");
   var fake = {
     blk: "0", bias: "0", near: "1", scale: "0", fps: "0",
     fz: "1", th: "1", core: "1", mode: "4",
-    minsz: "64", delay: "0", style: "0", sedge: "1", flat: "0",
-    skip: "", ver: "v0.20",
+    minsz: "64", delay: "0", style: "0", sedge: "1", flat: "0", testtex: "0", ttsize: "0", ttsm: "0",
+    skip: "", ver: "v0.24",
     texg: "TEXG t=60 fmt=37812 hex=0x93b4 sz=1024 n=40 ap=40\nTEXG t=60 fmt=37812 hex=0x93b4 sz=2048 n=6 ap=6\nTEXG t=60 fmt=37815 hex=0x93b7 sz=512 n=120 ap=120\nTEXG t=60 fmt=37496 hex=0x9278 sz=256 n=64 ap=60\nTEXG t=60 fmt=37497 hex=0x9279 sz=512 n=12 ap=0",
     ft: "FT fps=55.2 avg=18.1ms p50=17.6 p99=41.3 max=63.0 >33ms=3 >50ms=1 n=276 cap=0 bias=0 scale=100 t=125.0 fz=1"
   };
   var seq = 0;
-  var lookMode = 0;   /* 0=Off  1=Pixel Blocks  2=Detail Cut  3=Flat */
+  var TTSZ = [-2, -1, 0, 1, 2, 3];
+  var TTSZN = { "-2": "Finer", "-1": "Fine", "0": "Normal", "1": "Big", "2": "Bigger", "3": "Huge" };
+  var TTSZD = { "-2": "Smallest pixels (native size, no mip). Shimmers far away.",
+    "-1": "Small pixels, far surfaces stay finer than Normal. Little shimmer.",
+    "0": "Native texture pixels, the GPU picks the mip.",
+    "1": "Pixels about 2x bigger.", "2": "Pixels about 4x bigger.",
+    "3": "Pixels about 8x bigger (small textures are capped)." };
+  var TTSM = [0, 1];
+  var TTSMN = ["Sharp", "Soft"];
+  var TTSMD = ["Hard square pixels.", "Softens the jump between mip levels. Pixels stay square."];
+  var ttSize = 0, ttSm = 0;
+  var lookMode = 0;   /* 0=Off  1=Pixel Blocks  2=Detail Cut  3=Flat  4=Test Tex */
   var strVal = 3;     /* 1-5 for blocks, 1-4 for detail cut / flat */
   var fpsVal = 0, minVal = 64;
   var groups = [], skipSet = {}, extraSkip = [];
@@ -740,7 +765,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     var cmd =
       "D=" + D + "; " +
       "[ -d $D ] || { echo NODIR; exit 0; }; " +
-      "for f in bias scale fps fz th core near blk minsz delay style sedge flat mode; do " +
+      "for f in bias scale fps fz th core near blk minsz delay style sedge flat testtex ttsize ttsm mode; do " +
       "  if [ -f $D/$f.txt ]; then printf '%s=' $f; cat $D/$f.txt; else printf '%s=\\n' $f; fi; " +
       "done; " +
       "echo -n 'skip='; [ -f $D/skip.txt ] && cat $D/skip.txt | tr '\\n' '|' || true; echo; " +
@@ -976,12 +1001,14 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     if (lookMode === 1) cap = "<b>Pixel Blocks</b> · " + BLK[strVal] + " px";
     else if (lookMode === 2) cap = "<b>Detail Cut</b> · +" + strVal;
     else if (lookMode === 3) cap = "<b>Flat</b> · +" + strVal;
+    else if (lookMode === 4) cap = "<b>Test Tex</b> · nearest";
     $("pvBc").innerHTML = cap;
   }
 
   /* ---------- look + status ---------- */
   function stepItems(m) {
     var a = [], i;
+    if (m === 4) return a;  /* Test Tex: on/off only */
     if (m === 2 || m === 3) {
       for (i = 1; i <= 4; i++) a.push({ v: i, b: LVN[i], s: "+" + i });
     } else {
@@ -990,7 +1017,21 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     return a;
   }
 
+  function renderTT() {
+    var on = lookMode === 4;
+    $("ttSzRow").style.display = on ? "" : "none";
+    $("ttSmRow").style.display = on ? "" : "none";
+    $("strRow").style.display = on ? "none" : "";
+    $("ttszBox").innerHTML = chipsHtml(TTSZ, ttSize, function (v) { return TTSZN[v]; });
+    $("ttszV").textContent = TTSZN[ttSize];
+    $("ttszD").textContent = TTSZD[ttSize];
+    $("ttsmBox").innerHTML = chipsHtml(TTSM, ttSm, function (v) { return TTSMN[v]; });
+    $("ttsmV").textContent = TTSMN[ttSm];
+    $("ttsmD").textContent = TTSMD[ttSm];
+  }
+
   function updateLookUI() {
+    renderTT();
     Array.prototype.forEach.call($("lookSeg").children, function (b) {
       b.setAttribute("aria-checked", +b.getAttribute("data-m") === lookMode ? "true" : "false");
     });
@@ -1015,9 +1056,14 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     } else if (lookMode === 2) {
       $("strV").textContent = LVN[strVal];
       $("strD").textContent = "Textures are sampled " + strVal + " mip level" + (strVal === 1 ? "" : "s") + " smaller. Colors stay the same.";
-    } else {
+    } else if (lookMode === 3) {
       $("strV").textContent = LVN[strVal];
       $("strD").textContent = "Experimental. Surfaces become near-solid color. Start low (+1).";
+    } else if (lookMode === 4) {
+      $("strV").textContent = "On";
+      $("strD").textContent = "Test Tex — nearest sampling only. Full texture data, sharp pixels. Lighting stays.";
+      $("steps").innerHTML = "";
+      $("steps").setAttribute("aria-disabled", "true");
     }
     pvDraw();
     updateStatus();
@@ -1029,6 +1075,7 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     if (lookMode === 1) look = "Pixel Blocks · " + BLK[strVal] + " px";
     else if (lookMode === 2) look = "Detail Cut +" + strVal;
     else if (lookMode === 3) look = "Flat +" + strVal;
+    else if (lookMode === 4) look = "Test Tex";
     $("status").innerHTML =
       '<span class="chip' + (lookMode ? " on" : "") + '"><i></i>' + look + "</span>" +
       '<span class="chip">Scale ' + sc + "%</span>" +
@@ -1036,10 +1083,11 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
   }
 
   function applyLookToFiles() {
-    var map = { near: 1, bias: 0, sedge: 1, blk: 0, style: 0, flat: 0 };
+    var map = { near: 1, bias: 0, sedge: 1, blk: 0, style: 0, flat: 0, testtex: 0 };
     if (lookMode === 1) map.blk = BLK[strVal];
     else if (lookMode === 2) map.style = strVal;
     else if (lookMode === 3) map.flat = strVal;
+    else if (lookMode === 4) map.testtex = 1;
     return save(map, "Look");
   }
 
@@ -1122,7 +1170,13 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     var sty = parseInt(s.style, 10) || 0;
     var blk = parseInt(s.blk, 10) || 0;
     var flt = parseInt(s.flat, 10) || 0;
-    if (flt > 0) {
+    var ttx = parseInt(s.testtex, 10) || 0;
+    ttSize = Math.max(-2, Math.min(3, parseInt(s.ttsize, 10) || 0));
+    ttSm = Math.max(0, Math.min(1, parseInt(s.ttsm, 10) || 0));
+    if (ttx > 0) {
+      lookMode = 4;
+      strVal = 1;
+    } else if (flt > 0) {
       lookMode = 3;
       strVal = Math.max(1, Math.min(4, flt));
     } else if (sty > 0) {
@@ -1306,6 +1360,14 @@ body.pend .apply::after { display: block; animation: pulse 1.6s ease-in-out infi
     renderFps();
     updateStatus();
     save({ fps: v }, "Frame rate cap");
+  });
+  onPick("ttszBox", function (v) {
+    ttSize = v; renderTT();
+    save({ ttsize: v }, "Pixel size");
+  });
+  onPick("ttsmBox", function (v) {
+    ttSm = v; renderTT();
+    save({ ttsm: v }, "Edge blend");
   });
   onPick("minBox", function (v) {
     minVal = v;
