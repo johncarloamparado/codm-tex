@@ -1,21 +1,58 @@
-name: build
-on: [push, workflow_dispatch]
+name: Build Zygisk Module
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ANDROID_ABI: arm64-v8a
+  ANDROID_PLATFORM: android-26
+
 jobs:
-  b:
+  build-module:
+    name: Build module (arm64-v8a)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Build
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Fetch build dependencies
         run: |
-          curl -L -o zygisk.hpp https://raw.githubusercontent.com/topjohnwu/zygisk-module-sample/master/module/jni/zygisk.hpp
+          curl -fsSL -o zygisk.hpp \
+            https://raw.githubusercontent.com/topjohnwu/zygisk-module-sample/master/module/jni/zygisk.hpp
           git clone --depth 1 https://github.com/LSPosed/LSPlt
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -j4
+
+      - name: Configure (CMake, Android NDK)
+        run: |
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI="$ANDROID_ABI" \
+            -DANDROID_PLATFORM="$ANDROID_PLATFORM" \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Compile native library
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Read module version
+        id: meta
+        run: echo "version=$(sed -n 's/^version=//p' module.prop | tr -d '\r')" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble module package
+        run: |
           mkdir -p out/zygisk
           cp module.prop out/
           cp -r webroot out/
-          cp build/libs/libcodm_tex.so out/zygisk/arm64-v8a.so
-      - uses: actions/upload-artifact@v4
+          cp build/libs/libcodm_tex.so "out/zygisk/$ANDROID_ABI.so"
+
+      - name: Upload module package
+        uses: actions/upload-artifact@v6
         with:
-          name: codm_tex
+          name: codm-blocky-textures-${{ steps.meta.outputs.version }}
           path: out/
+          if-no-files-found: error
+          retention-days: 30
